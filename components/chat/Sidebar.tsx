@@ -161,7 +161,13 @@ export default function Sidebar({ isOpen, onToggle }: SidebarProps) {
       const { error } = await supabase.auth.signOut();
       if (error) throw error;
       
-      router.push("/login");
+      // Clear any local storage or state if needed
+      localStorage.removeItem('session');
+      
+      // Redirect to home page
+      router.push("/");
+      router.refresh(); // Force refresh to update auth state
+      
       toast({
         title: "Signed out",
         description: "Successfully signed out of your account",

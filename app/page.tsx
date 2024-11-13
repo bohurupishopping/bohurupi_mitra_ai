@@ -5,6 +5,32 @@ import { AnimatedSections } from "@/components/home/animated-sections";
 
 export const dynamic = 'force-dynamic';
 
+export const metadata = {
+  title: 'Bohurupi AI - Multi LLM Artificial Intelligence Platform',
+  description: 'Experience the power of multiple language models in one platform. Bohurupi AI lets you interact with various LLMs, compare their responses, and choose the best AI model for your needs.',
+  keywords: 'Bohurupi AI, multiple LLMs, artificial intelligence, language models, AI platform, chatbot, Claude, GPT, AI comparison',
+  openGraph: {
+    title: 'Bohurupi AI - Multi LLM Artificial Intelligence Platform',
+    description: 'Experience the power of multiple language models in one platform. Bohurupi AI lets you interact with various LLMs, compare their responses, and choose the best AI model for your needs.',
+    type: 'website',
+    locale: 'en_US',
+    images: [
+      {
+        url: '/assets/ai-icon.png',
+        width: 1200,
+        height: 630,
+        alt: 'Bohurupi AI Platform',
+      },
+    ],
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: 'Bohurupi AI - Multi LLM Artificial Intelligence Platform',
+    description: 'Experience the power of multiple language models in one platform. Bohurupi AI lets you interact with various LLMs, compare their responses, and choose the best AI model for your needs.',
+    images: ['/assets/ai-icon.png'],
+  },
+};
+
 export default function Home() {
   return (
     <div className="min-h-screen flex flex-col">

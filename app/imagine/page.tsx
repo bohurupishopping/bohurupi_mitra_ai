@@ -1,8 +1,8 @@
 "use client";
 
-import { useState } from 'react';
+import { useState, Suspense, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Send, ImageIcon, RefreshCw, Sparkles } from 'lucide-react';
+import { Send, ImageIcon, RefreshCw, Sparkles, Trash2 } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Card } from "@/components/ui/card";
@@ -12,8 +12,10 @@ import ModelSelector from '@/components/imagine/ModelSelector';
 import Image from 'next/image';
 import ImagePreview from '@/components/imagine/ImagePreview';
 import SizeSelector from '@/components/imagine/SizeSelector';
+import { ImageHistoryService } from '@/services/imageHistoryService';
+import type { ImageSession } from '@/services/imageHistoryService';
 
-export default function ImaginePage() {
+function ImagineContent() {
   const [prompt, setPrompt] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
@@ -24,6 +26,36 @@ export default function ImaginePage() {
   const [isEnhancing, setIsEnhancing] = useState(false);
   const [selectedSize, setSelectedSize] = useState('1024x1024');
   const { toast } = useToast();
+  const [imageHistoryService] = useState(() => ImageHistoryService.getInstance());
+  const [historyImages, setHistoryImages] = useState<ImageSession[]>([]);
+  const [selectedImagePrompt, setSelectedImagePrompt] = useState<string>('');
+
+  useEffect(() => {
+    loadImageHistory();
+    
+    const handleHistoryUpdate = () => {
+      loadImageHistory();
+    };
+    
+    window.addEventListener('image-history-updated', handleHistoryUpdate);
+    return () => {
+      window.removeEventListener('image-history-updated', handleHistoryUpdate);
+    };
+  }, []);
+
+  const loadImageHistory = async () => {
+    try {
+      const history = await imageHistoryService.getImageHistory();
+      setHistoryImages(history);
+    } catch (error) {
+      console.error('Error loading image history:', error);
+      toast({
+        title: "Error",
+        description: "Failed to load image history",
+        variant: "destructive",
+      });
+    }
+  };
 
   const handleEnhancePrompt = async () => {
     if (!prompt.trim() || isEnhancing) return;
@@ -80,8 +112,12 @@ export default function ImaginePage() {
       }
 
       if (data.success && data.data[0]?.url) {
-        setGeneratedImages(prev => [data.data[0].url, ...prev]);
-        setGeneratedImage(data.data[0].url);
+        const imageUrl = data.data[0].url;
+        setGeneratedImages(prev => [imageUrl, ...prev]);
+        setGeneratedImage(imageUrl);
+        
+        await imageHistoryService.saveImage(prompt, imageUrl);
+        
         toast({
           title: "Success",
           description: "Image generated successfully!",
@@ -101,8 +137,27 @@ export default function ImaginePage() {
     }
   };
 
+  const handleDeleteImage = async (id: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    
+    try {
+      await imageHistoryService.deleteImage(id);
+      toast({
+        title: "Success",
+        description: "Image deleted successfully",
+      });
+    } catch (error) {
+      console.error('Error deleting image:', error);
+      toast({
+        title: "Error",
+        description: "Failed to delete image",
+        variant: "destructive",
+      });
+    }
+  };
+
   return (
-    <div className="flex h-[100dvh] overflow-hidden bg-gradient-to-br from-blue-50 via-purple-50/50 to-pink-50/50">
+    <div className="flex h-[100dvh] overflow-hidden bg-gradient-to-br from-purple-100 via-blue-100 to-pink-100">
       <Sidebar 
         isOpen={isSidebarOpen} 
         onToggle={() => setIsSidebarOpen(!isSidebarOpen)} 
@@ -115,13 +170,20 @@ export default function ImaginePage() {
             bg-white/60 backdrop-blur-[10px] 
             rounded-lg sm:rounded-[2rem] 
             border border-white/20 
-            shadow-[0_8px_32px_rgba(0,0,0,0.12)] 
+            shadow-[0_8px_40px_rgba(0,0,0,0.12)] 
             relative flex flex-col overflow-hidden
             w-full max-w-[1400px] mx-auto
-            h-[calc(100dvh-20px)] sm:h-[calc(98dvh-16px)]"
-          >
-            {/* Content Area */}
-            <div className="flex-1 overflow-y-auto p-4">
+            h-[calc(100dvh-20px)] sm:h-[calc(98dvh-16px)]">
+            
+            <div className="absolute inset-0 rounded-[2rem] sm:rounded-[2.5rem] animate-glow">
+              <div className="absolute inset-0 rounded-[2rem] sm:rounded-[2.5rem] 
+                bg-gradient-to-r from-blue-500/20 via-purple-500/20 to-pink-500/20 
+                blur-xl opacity-50 animate-gradient-x">
+              </div>
+            </div>
+
+            {/* Content Area - keeping your existing grid layout */}
+            <div className="flex-1 overflow-y-auto p-4 relative z-10">
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4 max-w-7xl mx-auto">
                 {isLoading && (
                   <motion.div
@@ -135,29 +197,71 @@ export default function ImaginePage() {
                     <RefreshCw className="w-8 h-8 text-gray-400 animate-spin" />
                   </motion.div>
                 )}
-                {generatedImages.map((image, index) => (
+                {generatedImages.map((imageUrl, index) => (
                   <div
-                    key={index}
+                    key={`generated-${index}`}
                     className="relative aspect-square rounded-xl overflow-hidden
                       shadow-lg hover:shadow-xl transition-all duration-300
                       bg-white/50 backdrop-blur-sm border border-white/20
                       cursor-pointer group"
-                    onClick={() => setSelectedImage(image)}
+                    onClick={() => {
+                      setSelectedImage(imageUrl);
+                      setSelectedImagePrompt(prompt);
+                    }}
                   >
                     <Image
-                      src={image}
+                      src={imageUrl}
                       alt={`Generated image ${index + 1}`}
                       fill
+                      priority={index < 4}
                       className="object-cover group-hover:scale-105 transition-transform duration-300"
                       sizes="(max-width: 768px) 50vw, 25vw"
                     />
+                  </div>
+                ))}
+                {historyImages.map((imageSession, index) => (
+                  <div
+                    key={`history-${imageSession.id}`}
+                    className="relative aspect-square rounded-xl overflow-hidden
+                      shadow-lg hover:shadow-xl transition-all duration-300
+                      bg-white/50 backdrop-blur-sm border border-white/20
+                      cursor-pointer group"
+                    onClick={() => {
+                      setSelectedImage(imageSession.image_url);
+                      setSelectedImagePrompt(imageSession.prompt);
+                    }}
+                  >
+                    <Image
+                      src={imageSession.image_url}
+                      alt={`History image ${index + 1}`}
+                      fill
+                      priority={index < 4}
+                      className="object-cover group-hover:scale-105 transition-transform duration-300"
+                      sizes="(max-width: 768px) 50vw, 25vw"
+                    />
+                    <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <Button
+                        variant="destructive"
+                        size="icon"
+                        className="h-8 w-8 rounded-full bg-red-500/80 hover:bg-red-600 
+                          backdrop-blur-sm shadow-lg"
+                        onClick={(e) => handleDeleteImage(imageSession.id, e)}
+                      >
+                        <Trash2 className="h-4 w-4 text-white" />
+                      </Button>
+                    </div>
+                    <div className="absolute bottom-0 left-0 right-0 p-2 bg-black/50 
+                      backdrop-blur-sm text-white text-sm opacity-0 group-hover:opacity-100 
+                      transition-opacity">
+                      {imageSession.prompt}
+                    </div>
                   </div>
                 ))}
               </div>
             </div>
 
             {/* Input Area */}
-            <div className="border-t bg-white/10 p-4">
+            <div className="border-t bg-transparent p-2 sm:p-4">
               <form onSubmit={handleSubmit} className="max-w-2xl mx-auto">
                 <div className="relative group">
                   <motion.div
@@ -171,11 +275,13 @@ export default function ImaginePage() {
                   <div className="relative rounded-[2.5rem] overflow-hidden 
                     bg-white/10 backdrop-blur-md border border-white/20 
                     shadow-lg group-hover:shadow-xl transition-all duration-300">
+                    
+                    {/* Your existing Textarea with updated styling */}
                     <Textarea
                       value={prompt}
                       onChange={(e) => {
                         setPrompt(e.target.value);
-                        // Improved auto-resize logic
+                        // Your existing auto-resize logic stays the same
                         e.target.style.height = 'inherit';
                         const computed = window.getComputedStyle(e.target);
                         const height = parseInt(computed.getPropertyValue('border-top-width'), 10)
@@ -190,14 +296,15 @@ export default function ImaginePage() {
                       className="w-full min-h-[60px] max-h-[200px] px-6 py-4 text-base
                         bg-transparent border-none focus:outline-none focus:ring-0
                         placeholder:text-gray-400 resize-none selection:bg-blue-200/30
-                        transition-all duration-300 ease-in-out
-                        scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-transparent"
+                        [&:not(:focus)]:border-none [&:not(:focus)]:ring-0
+                        focus-visible:ring-0 focus-visible:ring-offset-0"
                       style={{ 
                         height: '60px',
                         overflowY: 'auto'
                       }}
                     />
                     
+                    {/* Your existing button area with updated styling */}
                     <div className="flex items-center justify-between p-3 
                       border-t border-white/10 bg-white/5">
                       <div className="flex items-center gap-3">
@@ -310,11 +417,28 @@ export default function ImaginePage() {
           <ImagePreview
             src={selectedImage}
             alt="Generated image preview"
-            prompt={prompt}
-            onClose={() => setSelectedImage(null)}
+            prompt={selectedImagePrompt}
+            onClose={() => {
+              setSelectedImage(null);
+              setSelectedImagePrompt('');
+            }}
           />
         )}
       </AnimatePresence>
     </div>
+  );
+}
+
+export default function ImaginePage() {
+  return (
+    <Suspense fallback={
+      <div className="flex h-[100dvh] items-center justify-center bg-gradient-to-br from-blue-50 via-purple-50/50 to-pink-50/50">
+        <div className="animate-spin">
+          <RefreshCw className="w-8 h-8 text-gray-400" />
+        </div>
+      </div>
+    }>
+      <ImagineContent />
+    </Suspense>
   );
 } 

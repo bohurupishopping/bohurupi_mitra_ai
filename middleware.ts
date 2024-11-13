@@ -10,33 +10,34 @@ export async function middleware(req: NextRequest) {
     data: { session },
   } = await supabase.auth.getSession();
 
-  // If there's no session and the user is trying to access a protected route
-  if (!session && isProtectedRoute(req.nextUrl.pathname)) {
+  // Protected routes
+  const protectedRoutes = ['/chat', '/imagine', '/profile', '/settings'];
+  const isProtectedRoute = protectedRoutes.some(route => 
+    req.nextUrl.pathname.startsWith(route)
+  );
+
+  // If accessing protected route without session, redirect to login
+  if (isProtectedRoute && !session) {
     const redirectUrl = new URL('/login', req.url);
+    redirectUrl.searchParams.set('redirectTo', req.nextUrl.pathname);
     return NextResponse.redirect(redirectUrl);
   }
 
-  // If there's a session and the user is trying to access auth routes (login)
-  if (session && isAuthRoute(req.nextUrl.pathname)) {
-    const redirectUrl = new URL('/chat', req.url);
-    return NextResponse.redirect(redirectUrl);
+  // If accessing auth pages (login/register) with active session, redirect to chat
+  if ((req.nextUrl.pathname === '/login' || req.nextUrl.pathname === '/register') && session) {
+    return NextResponse.redirect(new URL('/chat', req.url));
   }
 
   return res;
 }
 
-// Protected routes that require authentication
-function isProtectedRoute(pathname: string) {
-  const protectedRoutes = ['/chat', '/settings', '/profile'];
-  return protectedRoutes.some(route => pathname.startsWith(route));
-}
-
-// Auth routes that shouldn't be accessed when logged in
-function isAuthRoute(pathname: string) {
-  const authRoutes = ['/login'];
-  return authRoutes.includes(pathname);
-}
-
 export const config = {
-  matcher: ['/((?!api|_next/static|_next/image|assets|favicon.ico).*)'],
+  matcher: [
+    '/chat/:path*',
+    '/imagine/:path*',
+    '/profile/:path*',
+    '/settings/:path*',
+    '/login',
+    '/register'
+  ],
 };

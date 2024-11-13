@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Auth } from "@supabase/auth-ui-react";
 import { ThemeSupa } from "@supabase/auth-ui-shared";
 import { motion } from "framer-motion";
@@ -10,6 +10,8 @@ import { supabase } from "@/lib/supabase/client";
 
 export function LoginPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const redirectTo = searchParams.get('redirectTo') || '/chat';
 
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
@@ -17,13 +19,18 @@ export function LoginPage() {
         toast.success("Welcome to Bohurupi AI!", {
           description: "Successfully signed in to your account"
         });
-        router.push("/chat");
+        router.push(redirectTo);
         router.refresh();
       }
     });
 
     return () => subscription.unsubscribe();
-  }, [router]);
+  }, [router, redirectTo]);
+
+  const handleLoginSuccess = () => {
+    router.push(redirectTo);
+    router.refresh();
+  };
 
   return (
     <div className="h-[100dvh] w-full flex flex-col overflow-hidden">

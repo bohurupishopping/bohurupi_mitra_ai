@@ -9,20 +9,31 @@ export const useAIGeneration = () => {
   const [generatedContent, setGeneratedContent] = useState('');
   const conversationService = new ConversationService();
 
+  const getModelDisplayName = (modelId: string) => {
+    const modelMap: { [key: string]: string } = {
+      'gemini-1.5-pro': 'Gemini 1.5 Pro',
+      'gemini-1.5-flash': 'Gemini 1.5 Flash',
+      'groq': 'Llama 3.2 90B',
+      'open-mistral-nemo': 'Open Mistral Nemo',
+      'mistral-large': 'Mistral Large',
+      'xai': 'Grok',
+      'openai/gpt-4o-mini': 'GPT-4o Mini',
+      'google/gemma-2-9b-it:free': 'Gemma 2 9B',
+      'anthropic/claude-3.5-sonnet:beta': 'Claude 3.5'
+    };
+    return modelMap[modelId] || modelId;
+  };
+
   const buildContextualPrompt = async (newPrompt: string) => {
     try {
-      // Get recent conversations from the database
       const recentMessages = await conversationService.getRecentConversations(5);
       
-      // Format the conversation history
       const context = recentMessages
         .reverse()
         .map((msg: Message | DatabaseMessage) => {
           if ('role' in msg) {
-            // For messages with role property (Message type)
             return `${msg.role === 'user' ? 'User' : 'Assistant'}: ${msg.content}`;
           } else if ('prompt' in msg) {
-            // For messages from database (DatabaseMessage type)
             return `User: ${msg.prompt}\nAssistant: ${msg.response}`;
           }
           return '';
@@ -30,7 +41,6 @@ export const useAIGeneration = () => {
         .filter(Boolean)
         .join('\n\n');
 
-      // Build the final prompt with context
       const contextualPrompt = `
 Previous conversation history:
 ${context}
@@ -48,7 +58,11 @@ Based on our previous conversation, please provide an appropriate response. If I
 
   const generateContent = useCallback(async (prompt: string) => {
     try {
-      // Get contextual prompt
+      // Check if the prompt is asking about model identity
+      const isModelQuery = prompt.toLowerCase().includes('which model') || 
+                          prompt.toLowerCase().includes('what model') ||
+                          prompt.toLowerCase().includes('who are you');
+
       const contextualPrompt = await buildContextualPrompt(prompt);
       
       const options = {
@@ -57,15 +71,19 @@ Based on our previous conversation, please provide an appropriate response. If I
         topP: 0.4
       };
 
+      // Store the current model to ensure consistency
+      const currentModel = selectedModel;
+
       const response = await fetch('/api/generate', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          model: selectedModel,
+          model: currentModel,
           prompt: contextualPrompt,
-          options
+          options,
+          isModelQuery // Pass this to the API
         }),
       });
 
@@ -76,10 +94,18 @@ Based on our previous conversation, please provide an appropriate response. If I
       const data = await response.json();
 
       if (data.result) {
+        let finalResponse = data.result;
+
+        // Add model identity if needed
+        if (isModelQuery) {
+          const modelName = getModelDisplayName(currentModel);
+          finalResponse = `I am ${modelName}, an AI language model. ${finalResponse}`;
+        }
+
         // Save the conversation after successful generation
-        await conversationService.saveConversation(prompt, data.result);
-        setGeneratedContent(data.result);
-        return data.result;
+        await conversationService.saveConversation(prompt, finalResponse);
+        setGeneratedContent(finalResponse);
+        return finalResponse;
       }
 
       throw new Error('No content generated');
@@ -94,9 +120,31 @@ Based on our previous conversation, please provide an appropriate response. If I
     }
   }, [selectedModel, toast]);
 
+  // Persist model selection in localStorage
+  const handleModelChange = (model: string) => {
+    setSelectedModel(model);
+    try {
+      localStorage.setItem('selectedModel', model);
+    } catch (error) {
+      console.error('Error saving model preference:', error);
+    }
+  };
+
+  // Load saved model preference on initialization
+  useState(() => {
+    try {
+      const savedModel = localStorage.getItem('selectedModel');
+      if (savedModel) {
+        setSelectedModel(savedModel);
+      }
+    } catch (error) {
+      console.error('Error loading model preference:', error);
+    }
+  });
+
   return {
     selectedModel,
-    setSelectedModel,
+    setSelectedModel: handleModelChange, // Use the new handler instead of direct setState
     generatedContent,
     generateContent
   };

@@ -298,6 +298,59 @@ export default function ChatInterface({ defaultMessage, sessionId, onModelChange
             <span className="font-medium text-xs sm:hidden">Bohurupi AI</span>
           </div>
           <div className="flex items-center space-x-1 sm:space-x-2">
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button 
+                    variant="ghost" 
+                    size="icon" 
+                    className="h-8 w-8 sm:h-10 sm:w-10 rounded-full hover:bg-red-50 group"
+                    onClick={async () => {
+                      try {
+                        // Show confirmation dialog
+                        if (window.confirm('Are you sure you want to clear the chat?')) {
+                          // Clear messages from UI
+                          setMessages([{
+                            role: 'assistant',
+                            content: "# Hello! 👋\n\nI'm your AI assistant. How can I help you today?"
+                          }]);
+
+                          // Clear conversation history from database
+                          if (sessionId) {
+                            await conversationService.deleteChatSession(sessionId);
+                          } else {
+                            await conversationService.clearConversationHistory();
+                          }
+
+                          // Show success toast
+                          toast({
+                            title: "Chat Cleared",
+                            description: "All messages have been cleared successfully.",
+                            duration: 3000,
+                          });
+
+                          // Dispatch event to update any other components
+                          window.dispatchEvent(new CustomEvent('chat-updated'));
+                        }
+                      } catch (error) {
+                        console.error('Error clearing chat:', error);
+                        toast({
+                          title: "Error",
+                          description: "Failed to clear chat history. Please try again.",
+                          variant: "destructive",
+                        });
+                      }
+                    }}
+                  >
+                    <Trash2 className="w-4 h-4 sm:w-5 sm:h-5 text-red-500 group-hover:text-red-600 transition-colors" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>Clear chat</p>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+
             <Button variant="ghost" size="icon" className="h-8 w-8 sm:h-10 sm:w-10 rounded-full" onClick={toggleSearch}>
               <Search className="w-4 h-4 sm:w-5 sm:h-5" />
             </Button>

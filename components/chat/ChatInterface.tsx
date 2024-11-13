@@ -14,6 +14,8 @@ import { ModelSelector } from '@/components/chat/ModelSelector';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import ReactMarkdown from 'react-markdown';
 import { useAIGeneration } from './logic-ai-generation';
+import { StoryCreationPopup } from './StoryCreationPopup';
+import { StoryRewriterPopup } from './StoryRewriterPopup';
 
 interface Message {
   role: 'user' | 'assistant';
@@ -107,6 +109,8 @@ export default function ChatInterface({ defaultMessage, sessionId, onModelChange
   const { toast } = useToast();
   const [conversationService] = useState(() => new ConversationService(sessionId));
   const [attachments, setAttachments] = useState<FileUpload[]>([]);
+  const [isStoryCreatorOpen, setIsStoryCreatorOpen] = useState(false);
+  const [isStoryRewriterOpen, setIsStoryRewriterOpen] = useState(false);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -297,17 +301,18 @@ export default function ChatInterface({ defaultMessage, sessionId, onModelChange
             <Button variant="ghost" size="icon" className="h-8 w-8 sm:h-10 sm:w-10 rounded-full" onClick={toggleSearch}>
               <Search className="w-4 h-4 sm:w-5 sm:h-5" />
             </Button>
+            <Button variant="ghost" size="icon" className="h-8 w-8 sm:h-10 sm:w-10 rounded-full" onClick={() => setIsStoryCreatorOpen(true)}>
+              <BookOpen className="w-4 h-4 sm:w-5 sm:h-5" />
+            </Button>
+            <Button variant="ghost" size="icon" className="h-8 w-8 sm:h-10 sm:w-10 rounded-full" onClick={() => setIsStoryRewriterOpen(true)}>
+              <RefreshCw className="w-4 h-4 sm:w-5 sm:h-5" />
+            </Button>
             <Button variant="ghost" size="icon" className="h-8 w-8 sm:h-10 sm:w-10 rounded-full">
               <Settings className="w-4 h-4 sm:w-5 sm:h-5" />
             </Button>
             <Button variant="ghost" size="icon" className="h-8 w-8 sm:h-10 sm:w-10 rounded-full">
               <MoreVertical className="w-4 h-4 sm:w-5 sm:h-5" />
             </Button>
-            <ModelSelector 
-              onModelChange={handleModelChange}
-              compact={true}
-              isChatMode={true}
-            />
           </div>
         </CardHeader>
 
@@ -344,14 +349,19 @@ export default function ChatInterface({ defaultMessage, sessionId, onModelChange
               scroll-smooth"
           >
             <div className="p-2 sm:p-4 space-y-2 sm:space-y-3 relative z-10">
-              <AnimatePresence>
+              <AnimatePresence mode="popLayout">
                 {(searchQuery ? filteredMessages : messages).map((message, index) => (
                   <motion.div
                     key={index}
                     initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}
                     exit={{ opacity: 0, y: -20 }}
-                    transition={{ duration: 0.3 }}
+                    transition={{ 
+                      type: "spring",
+                      stiffness: 500,
+                      damping: 30,
+                      mass: 1
+                    }}
                     className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
                   >
                     <div className={`flex items-start space-x-1 sm:space-x-2 
@@ -421,18 +431,25 @@ export default function ChatInterface({ defaultMessage, sessionId, onModelChange
                     initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}
                     exit={{ opacity: 0, y: -20 }}
-                    transition={{ duration: 0.3 }}
+                    transition={{ type: "spring", stiffness: 500, damping: 30 }}
                     className="flex justify-start"
                   >
-                    <div className="flex items-center space-x-2 max-w-[80%]">
-                      <Avatar className="w-8 h-8">
-                        <AvatarImage src="/assets/ai-icon.png" alt="AI" />
-                      </Avatar>
-                      <div className="flex space-x-2 px-4 py-3 rounded-xl bg-white/50 backdrop-blur-[10px] border border-white/20">
-                        <div className="w-2 h-2 bg-blue-500 rounded-full animate-bounce" style={{ animationDelay: '0s' }}></div>
-                        <div className="w-2 h-2 bg-blue-500 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
-                        <div className="w-2 h-2 bg-blue-500 rounded-full animate-bounce" style={{ animationDelay: '0.4s' }}></div>
-                      </div>
+                    <div className="flex items-center space-x-2 px-4 py-3 rounded-xl bg-white/50">
+                      <motion.div
+                        animate={{ scale: [1, 1.2, 1] }}
+                        transition={{ repeat: Infinity, duration: 1, repeatDelay: 0.2 }}
+                        className="w-2 h-2 bg-blue-500 rounded-full"
+                      />
+                      <motion.div
+                        animate={{ scale: [1, 1.2, 1] }}
+                        transition={{ repeat: Infinity, duration: 1, delay: 0.2, repeatDelay: 0.2 }}
+                        className="w-2 h-2 bg-blue-500 rounded-full"
+                      />
+                      <motion.div
+                        animate={{ scale: [1, 1.2, 1] }}
+                        transition={{ repeat: Infinity, duration: 1, delay: 0.4, repeatDelay: 0.2 }}
+                        className="w-2 h-2 bg-blue-500 rounded-full"
+                      />
                     </div>
                   </motion.div>
                 )}
@@ -528,6 +545,12 @@ export default function ChatInterface({ defaultMessage, sessionId, onModelChange
                           <span className="hidden sm:inline">Attach</span>
                         </Button>
 
+                        <ModelSelector 
+                          onModelChange={handleModelChange}
+                          compact={true}
+                          isChatMode={true}
+                        />
+
                         <input
                           type="file"
                           ref={fileInputRef}
@@ -566,6 +589,24 @@ export default function ChatInterface({ defaultMessage, sessionId, onModelChange
           </div>
         </CardContent>
       </Card>
+      <>
+        <StoryCreationPopup 
+          isOpen={isStoryCreatorOpen}
+          onClose={() => setIsStoryCreatorOpen(false)}
+          onSubmit={(prompt: string) => {
+            setPrompt(prompt);
+            handleSubmit(new Event('submit') as any);
+          }}
+        />
+        <StoryRewriterPopup
+          isOpen={isStoryRewriterOpen}
+          onClose={() => setIsStoryRewriterOpen(false)}
+          onSubmit={(prompt: string) => {
+            setPrompt(prompt);
+            handleSubmit(new Event('submit') as any);
+          }}
+        />
+      </>
     </div>
   );
 }

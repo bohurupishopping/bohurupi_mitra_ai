@@ -3,7 +3,7 @@
 import { Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import ChatInterface from '@/components/chat/ChatInterface';
-import Sidebar from '@/components/chat/Sidebar';
+import Sidebar from '@/components/shared/Sidebar';
 import { useAIGeneration } from '@/components/chat/logic-ai-generation';
 import { useEffect, useState } from 'react';
 

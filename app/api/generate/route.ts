@@ -4,6 +4,7 @@ import { createOpenAI } from '@ai-sdk/openai/dist';
 import { createMistral } from '@ai-sdk/mistral/dist';
 import { createGroq } from '@ai-sdk/groq/dist';
 import { generateText } from 'ai';
+import { GoogleGenerativeAI } from "@google/generative-ai";
 
 // Initialize clients with server-side env variables
 const openRouterClient = new OpenAI({
@@ -34,14 +35,25 @@ const groqClient = createGroq({
   apiKey: process.env.GROQ_API_KEY || ''
 });
 
+// Initialize Google AI client
+const googleAI = new GoogleGenerativeAI(process.env.GOOGLE_API_KEY || '');
+
 export async function POST(req: Request) {
   try {
     const { model, prompt, options } = await req.json();
 
     let result;
 
+    // Handle Google AI models
+    if (model.startsWith('gemini-')) {
+      const modelName = model; // e.g. 'gemini-1.5-pro' or 'gemini-1.5-flash'
+      const googleModel = googleAI.getGenerativeModel({ model: modelName });
+      
+      const response = await googleModel.generateContent(prompt);
+      result = response.response.text();
+    }
     // Handle Together AI models
-    if (model.startsWith('together/')) {
+    else if (model.startsWith('together/')) {
       const modelName = model.replace('together/', '');
       const response = await togetherClient.chat.completions.create({
         model: modelName,

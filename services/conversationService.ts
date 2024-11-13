@@ -123,17 +123,23 @@ export class ConversationService {
 
   async deleteChatSession(sessionId: string): Promise<void> {
     try {
+      // Delete all messages for this session from conversations table
       const { error } = await supabase
         .from('conversations')
-        .update({ is_deleted: true })
+        .delete()  // Using delete instead of update since we want to remove the records
         .eq('session_id', sessionId);
 
-      if (error) throw error;
+      if (error) {
+        console.error('Supabase delete error:', error);
+        throw error;
+      }
 
+      // If we're deleting the current session, generate a new session ID
       if (sessionId === this.sessionId) {
         this.sessionId = uuidv4();
       }
 
+      // Dispatch event to update UI
       window.dispatchEvent(new CustomEvent('chat-updated'));
     } catch (error) {
       console.error('Error deleting chat session:', error);

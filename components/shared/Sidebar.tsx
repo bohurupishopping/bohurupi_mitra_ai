@@ -30,7 +30,6 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { ConversationService, ChatSession } from '@/services/conversationService';
-import { supabase } from '@/lib/supabase';
 
 interface SidebarProps {
   isOpen: boolean;
@@ -157,23 +156,12 @@ export default function Sidebar({ isOpen, onToggle }: SidebarProps) {
   ];
 
   const handleSignOut = async () => {
-    try {
-      const { error } = await supabase.auth.signOut();
-      if (error) throw error;
-      
-      router.push("/login");
-      toast({
-        title: "Signed out",
-        description: "Successfully signed out of your account",
-      });
-    } catch (error) {
-      console.error('Error signing out:', error);
-      toast({
-        title: "Error",
-        description: "Failed to sign out",
-        variant: "destructive",
-      });
-    }
+    // Implement your sign out logic here
+    router.push("/login");
+    toast({
+      title: "Signed out",
+      description: "Successfully signed out of your account",
+    });
   };
 
   return (

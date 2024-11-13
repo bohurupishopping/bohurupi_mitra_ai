@@ -13,7 +13,7 @@ export interface ChatSession {
 export interface Message {
   role: 'user' | 'assistant';
   content: string;
-  timestamp: string;
+  timestamp?: string;
 }
 
 export class ConversationService {
@@ -60,19 +60,11 @@ export class ConversationService {
       return data.flatMap(item => ([
         {
           role: 'user',
-          content: item.prompt,
-          timestamp: new Date(item.timestamp).toLocaleTimeString([], { 
-            hour: '2-digit', 
-            minute: '2-digit' 
-          })
+          content: item.prompt
         },
         {
           role: 'assistant',
-          content: item.response,
-          timestamp: new Date(item.timestamp).toLocaleTimeString([], { 
-            hour: '2-digit', 
-            minute: '2-digit' 
-          })
+          content: item.response
         }
       ]));
     } catch (error) {
@@ -84,18 +76,31 @@ export class ConversationService {
   async getChatSessions(limit: number = 10): Promise<ChatSession[]> {
     try {
       const { data, error } = await supabase
-        .from('conversation_stats')
+        .from('conversations')
         .select('*')
-        .limit(limit);
+        .eq('is_deleted', false)
+        .order('timestamp', { ascending: false });
 
       if (error) throw error;
 
-      return data?.map(session => ({
-        session_id: session.session_id,
-        last_message: session.session_end,
-        timestamp: session.session_end,
-        message_count: session.message_count
-      })) || [];
+      // Group by session_id and get latest message
+      const sessionMap = new Map<string, ChatSession>();
+      
+      data?.forEach(msg => {
+        if (!sessionMap.has(msg.session_id)) {
+          sessionMap.set(msg.session_id, {
+            session_id: msg.session_id,
+            last_message: msg.prompt,
+            timestamp: msg.timestamp,
+            message_count: 1
+          });
+        } else {
+          const session = sessionMap.get(msg.session_id)!;
+          session.message_count++;
+        }
+      });
+
+      return Array.from(sessionMap.values()).slice(0, limit);
     } catch (error) {
       console.error('Error getting chat sessions:', error);
       throw error;
@@ -153,19 +158,11 @@ export class ConversationService {
       return data.flatMap(item => ([
         {
           role: 'user',
-          content: item.prompt,
-          timestamp: new Date(item.timestamp).toLocaleTimeString([], { 
-            hour: '2-digit', 
-            minute: '2-digit' 
-          })
+          content: item.prompt
         },
         {
           role: 'assistant',
-          content: item.response,
-          timestamp: new Date(item.timestamp).toLocaleTimeString([], { 
-            hour: '2-digit', 
-            minute: '2-digit' 
-          })
+          content: item.response
         }
       ]));
     } catch (error) {

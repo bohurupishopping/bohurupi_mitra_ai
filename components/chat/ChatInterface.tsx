@@ -18,7 +18,7 @@ import { useAIGeneration } from './logic-ai-generation';
 interface Message {
   role: 'user' | 'assistant';
   content: string;
-  timestamp: string;
+  timestamp?: string;
 }
 
 interface ChatInterfaceProps {
@@ -93,8 +93,7 @@ export default function ChatInterface({ defaultMessage, sessionId, onModelChange
 
   const [messages, setMessages] = useState<Message[]>([{
     role: 'assistant',
-    content: defaultMessage || "# Hello! 👋\n\nI'm your AI assistant. How can I help you today?",
-    timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+    content: defaultMessage || "# Hello! 👋\n\nI'm your AI assistant. How can I help you today?"
   }]);
   const [prompt, setPrompt] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -220,8 +219,7 @@ export default function ChatInterface({ defaultMessage, sessionId, onModelChange
 
     const userMessage: Message = {
       role: 'user',
-      content: prompt,
-      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+      content: prompt
     };
 
     setMessages(prev => [...prev, userMessage]);
@@ -235,8 +233,7 @@ export default function ChatInterface({ defaultMessage, sessionId, onModelChange
       if (response) {
         const assistantMessage: Message = {
           role: 'assistant',
-          content: response,
-          timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+          content: response
         };
 
         setMessages(prev => [...prev, assistantMessage]);
@@ -415,9 +412,6 @@ export default function ChatInterface({ defaultMessage, sessionId, onModelChange
                             </TooltipProvider>
                           </div>
                         </motion.div>
-                        <span className="text-[10px] sm:text-xs text-gray-500 px-1.5">
-                          {message.timestamp}
-                        </span>
                       </div>
                     </div>
                   </motion.div>

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { useRouter, useSearchParams, usePathname } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -40,6 +40,7 @@ export default function Sidebar({ isOpen, onToggle }: SidebarProps) {
   const [isMobile, setIsMobile] = useState(false);
   const [isCollapsed, setIsCollapsed] = useState(false);
   const router = useRouter();
+  const pathname = usePathname();
   const searchParams = useSearchParams();
   const currentSessionId = searchParams.get('session');
   const { toast } = useToast();
@@ -275,7 +276,7 @@ export default function Sidebar({ isOpen, onToggle }: SidebarProps) {
                 isCollapsed ? 'justify-center' : 'justify-start'
               } gap-3 px-4 py-3 rounded-2xl transition-all duration-300 
               hover:bg-white/40 hover:shadow-md
-              ${location.pathname === item.href
+              ${pathname === item.href
                 ? 'bg-white/50 text-gray-900 shadow-md'
                 : 'text-gray-700'}`}
               onClick={() => router.push(item.href)}

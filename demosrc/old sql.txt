@@ -1,0 +1,80 @@
+-- Enable UUID extension if not already enabled
+CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+
+-- Set proper permissions
+GRANT USAGE ON SCHEMA public TO postgres, anon, authenticated, service_role;
+GRANT ALL ON ALL TABLES IN SCHEMA public TO postgres, anon, authenticated, service_role;
+GRANT ALL ON ALL SEQUENCES IN SCHEMA public TO postgres, anon, authenticated, service_role;
+GRANT ALL ON ALL ROUTINES IN SCHEMA public TO postgres, anon, authenticated, service_role;
+
+-- Create conversations table
+CREATE TABLE IF NOT EXISTS public.conversations (
+    id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
+    user_id UUID REFERENCES auth.users(id),
+    session_id UUID NOT NULL,
+    message_id UUID DEFAULT uuid_generate_v4() NOT NULL,
+    prompt TEXT NOT NULL,
+    response TEXT NOT NULL,
+    timestamp TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    metadata JSONB DEFAULT '{}'::jsonb,
+    is_deleted BOOLEAN DEFAULT FALSE
+);
+
+-- Create indexes
+CREATE INDEX IF NOT EXISTS idx_conversations_session_id ON public.conversations(session_id);
+CREATE INDEX IF NOT EXISTS idx_conversations_user_id ON public.conversations(user_id);
+CREATE INDEX IF NOT EXISTS idx_conversations_timestamp ON public.conversations(timestamp DESC);
+CREATE INDEX IF NOT EXISTS idx_conversations_message_id ON public.conversations(message_id);
+CREATE INDEX IF NOT EXISTS idx_conversations_session_timestamp ON public.conversations(session_id, timestamp DESC);
+
+-- Enable RLS
+ALTER TABLE public.conversations ENABLE ROW LEVEL SECURITY;
+
+-- Drop existing policies if they exist
+DROP POLICY IF EXISTS "Enable read access for all users" ON public.conversations;
+DROP POLICY IF EXISTS "Enable insert access for all users" ON public.conversations;
+DROP POLICY IF EXISTS "Enable delete access for all users" ON public.conversations;
+
+-- Create new policies
+CREATE POLICY "Enable read access for all users" 
+ON public.conversations FOR SELECT 
+USING (true);  -- Allows all users to read
+
+CREATE POLICY "Enable insert access for all users" 
+ON public.conversations FOR INSERT 
+WITH CHECK (true);  -- Allows all users to insert
+
+CREATE POLICY "Enable delete access for all users" 
+ON public.conversations FOR DELETE 
+USING (true);  -- Allows all users to delete
+
+-- Grant table permissions
+GRANT ALL ON public.conversations TO postgres, authenticated, anon, service_role;
+GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO postgres, authenticated, anon, service_role;
+
+-- Create view with proper permissions
+CREATE OR REPLACE VIEW public.conversation_stats AS
+SELECT
+    session_id,
+    COUNT(*) as message_count,
+    MIN(timestamp) as session_start,
+    MAX(timestamp) as session_end,
+    user_id
+FROM public.conversations
+WHERE NOT is_deleted
+GROUP BY session_id, user_id;
+
+-- Grant view permissions
+GRANT SELECT ON public.conversation_stats TO postgres, authenticated, anon, service_role;
+
+-- Add comments
+COMMENT ON TABLE public.conversations IS 'Stores chat conversations between users and AI';
+COMMENT ON COLUMN public.conversations.id IS 'Unique identifier for each conversation entry';
+COMMENT ON COLUMN public.conversations.user_id IS 'Reference to the auth.users table, can be null for anonymous users';
+COMMENT ON COLUMN public.conversations.session_id IS 'Groups messages into conversation sessions';
+COMMENT ON COLUMN public.conversations.message_id IS 'Unique identifier for each message within a conversation';
+COMMENT ON COLUMN public.conversations.prompt IS 'The user''s input or question';
+COMMENT ON COLUMN public.conversations.response IS 'The AI''s response to the prompt';
+COMMENT ON COLUMN public.conversations.timestamp IS 'When the conversation occurred';
+COMMENT ON COLUMN public.conversations.metadata IS 'Additional metadata about the conversation';
+COMMENT ON COLUMN public.conversations.is_deleted IS 'Soft delete flag for logical deletion';

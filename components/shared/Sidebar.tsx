@@ -18,7 +18,11 @@ import {
   Eye,
   Menu,
   X,
-  PanelLeftOpen
+  PanelLeftOpen,
+  Sparkles,
+  Globe2,
+  Zap,
+  Radio
 } from 'lucide-react';
 import { useToast } from "@/components/ui/use-toast";
 import {
@@ -152,6 +156,13 @@ export default function Sidebar({ isOpen, onToggle }: SidebarProps) {
       href: '/imagine', 
       color: 'text-indigo-400',
       description: 'AI Image Generation'
+    },
+    { 
+      icon: Globe2, 
+      label: 'Lively', 
+      href: '/lively', 
+      color: 'text-emerald-400',
+      description: 'Real-time AI with Grounding'
     },
   ];
 

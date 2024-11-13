@@ -18,13 +18,32 @@ export interface Message {
 
 export class ConversationService {
   private sessionId: string;
+  private userId: string | null = null;
 
   constructor(sessionId?: string) {
     this.sessionId = sessionId || uuidv4();
+    this.initializeUserId();
+  }
+
+  private async initializeUserId() {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      this.userId = user?.id || null;
+    } catch (error) {
+      console.error('Error getting user:', error);
+      this.userId = null;
+    }
+  }
+
+  private async getCurrentUser() {
+    const { data: { user } } = await supabase.auth.getUser();
+    return user;
   }
 
   async saveConversation(prompt: string, response: string): Promise<void> {
     try {
+      const user = await this.getCurrentUser();
+      
       const { error } = await supabase
         .from('conversations')
         .insert({
@@ -34,7 +53,8 @@ export class ConversationService {
           response,
           timestamp: new Date().toISOString(),
           metadata: {},
-          is_deleted: false
+          is_deleted: false,
+          user_id: user?.id || null
         });
 
       if (error) throw error;
@@ -46,26 +66,29 @@ export class ConversationService {
 
   async loadChatSession(sessionId: string): Promise<Message[]> {
     try {
-      const { data, error } = await supabase
+      const user = await this.getCurrentUser();
+      
+      const query = supabase
         .from('conversations')
         .select('*')
         .eq('session_id', sessionId)
         .eq('is_deleted', false)
         .order('timestamp', { ascending: true });
 
-      if (error) throw error;
+      if (user?.id) {
+        query.eq('user_id', user.id);
+      } else {
+        query.is('user_id', null);
+      }
 
+      const { data, error } = await query;
+
+      if (error) throw error;
       if (!data) return [];
 
       return data.flatMap(item => ([
-        {
-          role: 'user',
-          content: item.prompt
-        },
-        {
-          role: 'assistant',
-          content: item.response
-        }
+        { role: 'user', content: item.prompt },
+        { role: 'assistant', content: item.response }
       ]));
     } catch (error) {
       console.error('Error loading chat session:', error);
@@ -75,15 +98,24 @@ export class ConversationService {
 
   async getChatSessions(limit: number = 10): Promise<ChatSession[]> {
     try {
-      const { data, error } = await supabase
+      const user = await this.getCurrentUser();
+      
+      const query = supabase
         .from('conversations')
         .select('*')
         .eq('is_deleted', false)
         .order('timestamp', { ascending: false });
 
+      if (user?.id) {
+        query.eq('user_id', user.id);
+      } else {
+        query.is('user_id', null);
+      }
+
+      const { data, error } = await query;
+
       if (error) throw error;
 
-      // Group by session_id and get latest message
       const sessionMap = new Map<string, ChatSession>();
       
       data?.forEach(msg => {
@@ -109,11 +141,20 @@ export class ConversationService {
 
   async clearConversationHistory(): Promise<void> {
     try {
-      const { error } = await supabase
+      const user = await this.getCurrentUser();
+      
+      const query = supabase
         .from('conversations')
         .update({ is_deleted: true })
         .eq('session_id', this.sessionId);
 
+      if (user?.id) {
+        query.eq('user_id', user.id);
+      } else {
+        query.is('user_id', null);
+      }
+
+      const { error } = await query;
       if (error) throw error;
     } catch (error) {
       console.error('Error clearing conversation history:', error);
@@ -123,23 +164,26 @@ export class ConversationService {
 
   async deleteChatSession(sessionId: string): Promise<void> {
     try {
-      // Delete all messages for this session from conversations table
-      const { error } = await supabase
+      const user = await this.getCurrentUser();
+      
+      const query = supabase
         .from('conversations')
-        .delete()  // Using delete instead of update since we want to remove the records
+        .delete()
         .eq('session_id', sessionId);
 
-      if (error) {
-        console.error('Supabase delete error:', error);
-        throw error;
+      if (user?.id) {
+        query.eq('user_id', user.id);
+      } else {
+        query.is('user_id', null);
       }
 
-      // If we're deleting the current session, generate a new session ID
+      const { error } = await query;
+      if (error) throw error;
+
       if (sessionId === this.sessionId) {
         this.sessionId = uuidv4();
       }
 
-      // Dispatch event to update UI
       window.dispatchEvent(new CustomEvent('chat-updated'));
     } catch (error) {
       console.error('Error deleting chat session:', error);
@@ -149,7 +193,9 @@ export class ConversationService {
 
   async getRecentConversations(limit: number = 5): Promise<Message[]> {
     try {
-      const { data, error } = await supabase
+      const user = await this.getCurrentUser();
+      
+      const query = supabase
         .from('conversations')
         .select('*')
         .eq('session_id', this.sessionId)
@@ -157,19 +203,20 @@ export class ConversationService {
         .order('timestamp', { ascending: false })
         .limit(limit);
 
-      if (error) throw error;
+      if (user?.id) {
+        query.eq('user_id', user.id);
+      } else {
+        query.is('user_id', null);
+      }
 
+      const { data, error } = await query;
+
+      if (error) throw error;
       if (!data) return [];
 
       return data.flatMap(item => ([
-        {
-          role: 'user',
-          content: item.prompt
-        },
-        {
-          role: 'assistant',
-          content: item.response
-        }
+        { role: 'user', content: item.prompt },
+        { role: 'assistant', content: item.response }
       ]));
     } catch (error) {
       console.error('Error getting recent conversations:', error);

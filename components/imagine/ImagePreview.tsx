@@ -17,21 +17,8 @@ export default function ImagePreview({ src, alt, prompt, onClose }: ImagePreview
   const [isCopied, setIsCopied] = useState(false);
   const { toast } = useToast();
 
-  const handleDownload = async () => {
-    try {
-      const response = await fetch(src);
-      const blob = await response.blob();
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `generated-image-${Date.now()}.png`;
-      document.body.appendChild(a);
-      a.click();
-      window.URL.revokeObjectURL(url);
-      document.body.removeChild(a);
-    } catch (error) {
-      console.error('Error downloading image:', error);
-    }
+  const handleDownload = () => {
+    window.open(src, '_blank');
   };
 
   const handleCopyPrompt = async () => {

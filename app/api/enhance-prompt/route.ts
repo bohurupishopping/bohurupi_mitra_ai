@@ -6,6 +6,17 @@ const client = new OpenAI({
   baseURL: 'https://api.mistral.ai/v1',
 });
 
+const systemPrompt = `You are an expert at writing prompts for AI image generation.
+Your task is to enhance the given prompt to create photorealistic, highly detailed images.
+Follow these guidelines:
+- Add specific details about lighting, atmosphere, and composition
+- Include technical photography terms and camera settings
+- Specify artistic style and mood
+- Keep the core subject/idea from the original prompt
+- Make the prompt detailed but concise (max 200 words)
+- Focus on photorealistic quality
+Do not include negative prompts or technical parameters - only enhance the descriptive content.`;
+
 export async function POST(request: Request) {
   try {
     const { prompt } = await request.json();
@@ -19,16 +30,13 @@ export async function POST(request: Request) {
       messages: [
         {
           role: 'system',
-          content: `You are an expert at writing prompts for AI image generation.
-      Please enhance the following prompt to create a more detailed and visually descriptive version.
-      Focus on adding specific details about style, lighting, composition, and mood.
-      Keep the enhanced prompt concise but descriptive.`
+          content: systemPrompt
         },
         {
           role: 'user',
           content: `Original prompt: "${prompt}"
             
-            Enhanced prompt:`
+Please enhance this prompt to create a photorealistic image. Focus on visual details, lighting, and atmosphere.`
         }
       ],
       temperature: 0.7,

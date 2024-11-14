@@ -14,19 +14,40 @@ const formatEnhancedPrompt = (
   mainPrompt: string, 
   size: ImageSize
 ): { prompt: string; negative_prompt: string } => {
+  // Add composition guidance based on aspect ratio
+  let compositionGuide = '';
+  switch(size) {
+    case '1024x1792':
+      compositionGuide = 'vertical composition, portrait orientation, full body shot, strong vertical lines, elegant vertical framing';
+      break;
+    case '1792x1024':
+      compositionGuide = 'horizontal composition, landscape orientation, panoramic view, wide angle perspective, cinematic aspect ratio';
+      break;
+    default: // 1024x1024
+      compositionGuide = 'balanced square composition, centered framing, symmetrical arrangement';
+  }
+
   // Enhance positive prompt
   const enhancedPrompt = `
-    Create a highly detailed image:
     ${mainPrompt}
-    Style: This breathtaking photograph, (realistic, photo-Realistic:1.3), best quality, masterpiece, beautiful and aesthetic, cinematic lighting, ambient lighting, backlit, softer lens filter, full of love and romantic atmosphere, beautifully showcases the raw and authentic beauty of life, 
-    Technical details: ${size}, 16K, (HDR:1.4), high contrast, (vibrant color:1.4), (muted colors, dim colors, soothing tones:0), shot on Kodak Gold 400 film, high resolution 8k image quality, more detail
+    ${compositionGuide},
+    (photorealistic:1.4), (hyperrealistic:1.3), masterpiece, professional photography, 
+    8k resolution, highly detailed, sharp focus, HDR, high contrast,
+    cinematic lighting, volumetric lighting, ambient occlusion, ray tracing, 
+    professional color grading, dramatic atmosphere,
+    shot on Hasselblad H6D-400C, 100mm f/2.8 lens, golden hour photography,
+    detailed textures, intricate details, pristine quality, award-winning photography
   `.trim();
 
-  // Enhance negative prompt
+  // Enhanced negative prompt for better results
   const enhancedNegativePrompt = `
-    low quality, blurry, pixelated, poor composition, 
-    bad lighting, distorted proportions, deformed, 
-    watermark, signature, text, duplicate, error
+    cartoon, anime, illustration, painting, drawing, art, 
+    low quality, low resolution, blurry, noisy, grainy,
+    oversaturated, overexposed, underexposed, 
+    deformed, distorted, disfigured, 
+    watermark, signature, text, logo,
+    bad anatomy, bad proportions, amateur, unprofessional,
+    wrong aspect ratio, stretched image, poorly cropped
   `.trim();
 
   return {

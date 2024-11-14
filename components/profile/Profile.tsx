@@ -25,10 +25,11 @@ import {
   Lock,
   Search,
   History,
-  AlertCircle
+  AlertCircle,
+  Loader2
 } from 'lucide-react'
 import { useRouter } from 'next/navigation'
-import { motion, AnimatePresence } from 'framer-motion'
+import { motion, AnimatePresence, spring } from 'framer-motion'
 import { ConversationService, ChatSession } from '@/services/conversationService'
 import { formatDistanceToNow } from 'date-fns'
 import {
@@ -40,6 +41,19 @@ import {
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Alert, AlertDescription } from "@/components/ui/alert"
+
+const springTransition = {
+  type: "spring",
+  stiffness: 300,
+  damping: 30
+}
+
+const fadeInScale = {
+  initial: { opacity: 0, scale: 0.95 },
+  animate: { opacity: 1, scale: 1 },
+  exit: { opacity: 0, scale: 0.95 },
+  transition: springTransition
+}
 
 export default function Profile() {
   const router = useRouter()
@@ -103,13 +117,31 @@ export default function Profile() {
         setUser(user)
         setEmail(user.email || '')
         
-        const { data: profile } = await supabase
+        const { data: profile, error } = await supabase
           .from('user_profiles')
-          .select('display_name')
+          .select('*')
           .eq('user_id', user.id)
-          .maybeSingle()
+          .single()
         
-        if (profile) {
+        if (error && error.code === 'PGRST116') {
+          const { data: newProfile, error: createError } = await supabase
+            .from('user_profiles')
+            .insert([
+              { 
+                user_id: user.id,
+                display_name: '',
+                created_at: new Date().toISOString(),
+                updated_at: new Date().toISOString()
+              }
+            ])
+            .select()
+            .single()
+          
+          if (createError) throw createError
+          if (newProfile) {
+            setDisplayName(newProfile.display_name || '')
+          }
+        } else if (profile) {
           setDisplayName(profile.display_name || '')
         }
       }
@@ -129,23 +161,28 @@ export default function Profile() {
     try {
       if (!user) return
 
+      const updates = {
+        user_id: user.id,
+        display_name: displayName,
+        updated_at: new Date().toISOString()
+      }
+
       const { error: profileError } = await supabase
         .from('user_profiles')
-        .upsert({ 
-          user_id: user.id,
-          display_name: displayName,
-          updated_at: new Date().toISOString()
+        .upsert(updates, {
+          onConflict: 'user_id'
         })
 
       if (profileError) throw profileError
 
       toast({
-        title: "Profile updated",
+        title: "Success",
         description: "Your profile has been updated successfully",
       })
       
       window.dispatchEvent(new Event('profile-updated'))
     } catch (error) {
+      console.error('Error updating profile:', error)
       toast({
         title: "Error",
         description: "Failed to update profile",
@@ -192,31 +229,54 @@ export default function Profile() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-screen">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
-      </div>
+      <motion.div 
+        className="flex items-center justify-center h-screen"
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+      >
+        <Loader2 className="h-8 w-8 animate-spin text-blue-500" />
+      </motion.div>
     )
   }
 
   return (
-    <div className="container max-w-6xl mx-auto p-6">
-      <Button 
-        variant="ghost" 
-        onClick={() => router.push('/chat')}
-        className="mb-6 hover:bg-gray-100/40 group"
+    <motion.div 
+      className="container max-w-6xl mx-auto p-6"
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.4 }}
+    >
+      <motion.div
+        whileHover={{ x: -5 }}
+        transition={{ duration: 0.2 }}
       >
-        <ArrowLeft className="mr-2 h-4 w-4 group-hover:-translate-x-1 transition-transform duration-200" />
-        Back to Chat
-      </Button>
+        <Button 
+          variant="ghost" 
+          onClick={() => router.push('/chat')}
+          className="mb-6 hover:bg-gray-100/40 group"
+        >
+          <ArrowLeft className="mr-2 h-4 w-4 group-hover:-translate-x-1 transition-transform duration-200" />
+          Back to Chat
+        </Button>
+      </motion.div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        {/* Profile Settings Section */}
-        <div className="md:col-span-1 space-y-6">
+        <motion.div 
+          className="md:col-span-1 space-y-6"
+          {...fadeInScale}
+        >
           {/* Profile Card */}
-          <Card className="bg-white/60 backdrop-blur-xl border-gray-200/30 overflow-hidden">
+          <Card className="bg-white/60 backdrop-blur-xl border-gray-200/30 overflow-hidden
+            shadow-lg hover:shadow-xl transition-shadow duration-300">
             <CardHeader className="bg-gradient-to-br from-blue-50 to-purple-50 border-b border-gray-200/30">
-              <div className="flex items-center gap-4">
-                <Avatar className="h-16 w-16 border-2 border-white shadow-lg">
+              <motion.div 
+                className="flex items-center gap-4"
+                whileHover={{ scale: 1.02 }}
+                transition={{ duration: 0.2 }}
+              >
+                <Avatar className="h-16 w-16 border-2 border-white shadow-lg
+                  ring-2 ring-purple-200 ring-offset-2">
                   <AvatarImage src="/assets/pritam-img.png" />
                   <AvatarFallback>
                     <UserRound className="h-8 w-8 text-gray-400" />
@@ -228,10 +288,14 @@ export default function Profile() {
                     Manage your account settings
                   </CardDescription>
                 </div>
-              </div>
+              </motion.div>
             </CardHeader>
             <CardContent className="space-y-6 p-6">
-              <div className="space-y-2">
+              <motion.div 
+                className="space-y-2"
+                whileHover={{ scale: 1.01 }}
+                transition={{ duration: 0.2 }}
+              >
                 <label className="text-sm font-medium flex items-center gap-2 text-gray-700">
                   <UserRound className="h-4 w-4 text-blue-500" />
                   Display Name
@@ -240,11 +304,16 @@ export default function Profile() {
                   type="text"
                   value={displayName}
                   onChange={(e) => setDisplayName(e.target.value)}
-                  className="bg-white/50 border-gray-200/50 focus:border-blue-300"
+                  className="bg-white/50 border-gray-200/50 focus:border-blue-300
+                    transition-all duration-200 hover:border-blue-200"
                 />
-              </div>
+              </motion.div>
 
-              <div className="space-y-2">
+              <motion.div 
+                className="space-y-2"
+                whileHover={{ scale: 1.01 }}
+                transition={{ duration: 0.2 }}
+              >
                 <label className="text-sm font-medium flex items-center gap-2 text-gray-700">
                   <Mail className="h-4 w-4 text-purple-500" />
                   Email
@@ -255,71 +324,99 @@ export default function Profile() {
                   disabled
                   className="bg-gray-50 border-gray-200/50"
                 />
-              </div>
+              </motion.div>
 
-              <Button
-                onClick={updateProfile}
-                className="w-full bg-gradient-to-r from-blue-400 to-purple-400 
-                  hover:from-blue-500 hover:to-purple-500 text-white
-                  transition-all duration-300 transform hover:scale-[1.02]"
+              <motion.div
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.98 }}
               >
-                <Save className="mr-2 h-4 w-4" />
-                Save Changes
-              </Button>
+                <Button
+                  onClick={updateProfile}
+                  className="w-full bg-gradient-to-r from-blue-400 to-purple-400 
+                    hover:from-blue-500 hover:to-purple-500 text-white
+                    transition-all duration-300 transform hover:scale-[1.02]
+                    shadow-md hover:shadow-lg"
+                >
+                  <Save className="mr-2 h-4 w-4" />
+                  Save Changes
+                </Button>
+              </motion.div>
             </CardContent>
           </Card>
 
-          {/* Password Change Card */}
-          <Card className="bg-white/60 backdrop-blur-xl border-gray-200/30">
-            <CardHeader>
-              <div className="flex items-center gap-3">
-                <Lock className="h-5 w-5 text-purple-500" />
-                <div>
-                  <CardTitle>Password</CardTitle>
-                  <CardDescription>
-                    Update your password
-                  </CardDescription>
+          {/* Password Change Card with enhanced animations */}
+          <motion.div {...fadeInScale} transition={{ delay: 0.1 }}>
+            <Card className="bg-white/60 backdrop-blur-xl border-gray-200/30
+              shadow-lg hover:shadow-xl transition-shadow duration-300">
+              <CardHeader>
+                <div className="flex items-center gap-3">
+                  <Lock className="h-5 w-5 text-purple-500" />
+                  <div>
+                    <CardTitle>Password</CardTitle>
+                    <CardDescription>
+                      Update your password
+                    </CardDescription>
+                  </div>
                 </div>
-              </div>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="space-y-2">
-                <Input
-                  type="password"
-                  placeholder="Current Password"
-                  value={currentPassword}
-                  onChange={(e) => setCurrentPassword(e.target.value)}
-                  className="bg-white/50 border-gray-200/50"
-                />
-                <Input
-                  type="password"
-                  placeholder="New Password"
-                  value={newPassword}
-                  onChange={(e) => setNewPassword(e.target.value)}
-                  className="bg-white/50 border-gray-200/50"
-                />
-                <Input
-                  type="password"
-                  placeholder="Confirm New Password"
-                  value={confirmPassword}
-                  onChange={(e) => setConfirmPassword(e.target.value)}
-                  className="bg-white/50 border-gray-200/50"
-                />
-              </div>
-              <Button
-                onClick={handlePasswordChange}
-                variant="outline"
-                className="w-full hover:bg-purple-50"
-              >
-                <Lock className="mr-2 h-4 w-4" />
-                Update Password
-              </Button>
-            </CardContent>
-          </Card>
-        </div>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <motion.div 
+                  className="space-y-2"
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.2 }}
+                >
+                  <Input
+                    type="password"
+                    placeholder="Current Password"
+                    value={currentPassword}
+                    onChange={(e) => setCurrentPassword(e.target.value)}
+                    className="bg-white/50 border-gray-200/50 focus:border-purple-300
+                      transition-all duration-200 hover:border-purple-200"
+                  />
+                  <Input
+                    type="password"
+                    placeholder="New Password"
+                    value={newPassword}
+                    onChange={(e) => setNewPassword(e.target.value)}
+                    className="bg-white/50 border-gray-200/50 focus:border-purple-300
+                      transition-all duration-200 hover:border-purple-200"
+                  />
+                  <Input
+                    type="password"
+                    placeholder="Confirm New Password"
+                    value={confirmPassword}
+                    onChange={(e) => setConfirmPassword(e.target.value)}
+                    className="bg-white/50 border-gray-200/50 focus:border-purple-300
+                      transition-all duration-200 hover:border-purple-200"
+                  />
+                </motion.div>
+                
+                <motion.div
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
+                >
+                  <Button
+                    onClick={handlePasswordChange}
+                    variant="outline"
+                    className="w-full hover:bg-purple-50 border-purple-200
+                      transition-all duration-300"
+                  >
+                    <Lock className="mr-2 h-4 w-4" />
+                    Update Password
+                  </Button>
+                </motion.div>
+              </CardContent>
+            </Card>
+          </motion.div>
+        </motion.div>
 
-        {/* Chat History Section */}
-        <div className="md:col-span-2">
+        {/* Chat History Section with enhanced animations */}
+        <motion.div 
+          className="md:col-span-2"
+          {...fadeInScale}
+          transition={{ delay: 0.2 }}
+        >
           <Card className="bg-white/60 backdrop-blur-xl border-gray-200/30">
             <CardHeader className="border-b border-gray-200/30">
               <div className="flex items-center justify-between">
@@ -410,8 +507,8 @@ export default function Profile() {
               </div>
             </ScrollArea>
           </Card>
-        </div>
+        </motion.div>
       </div>
-    </div>
+    </motion.div>
   )
 }

@@ -112,16 +112,21 @@ export function ModelSelector({ onModelChange, compact, isChatMode }: ModelSelec
     <Select onValueChange={onModelChange}>
       <SelectTrigger 
         className={`${compact ? 'w-[160px]' : 'w-[180px]'} 
-          bg-white/80 backdrop-blur-sm border border-gray-100
+          bg-white/10 backdrop-blur-sm border border-white/20
           rounded-xl shadow-sm hover:shadow-md transition-all duration-200
           ${isChatMode ? 'h-9' : 'h-9'} px-3
-          focus:outline-none focus:ring-1 focus:ring-gray-100 focus:border-gray-200`}
+          focus:outline-none focus:ring-1 focus:ring-white/30 focus:border-white/30
+          text-gray-600 hover:bg-white/20
+          group relative overflow-hidden`}
       >
+        <div className="absolute inset-0 bg-gradient-to-r from-purple-500/10 to-blue-500/10 
+          opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
         <SelectValue placeholder="Select Model" />
       </SelectTrigger>
       <SelectContent 
-        className="rounded-xl bg-white/95 backdrop-blur-xl border border-gray-100/60 shadow-lg 
-          max-h-[280px] overflow-y-auto p-0.5 min-w-[160px] focus:outline-none"
+        className="rounded-xl bg-white/95 backdrop-blur-xl border border-white/20 shadow-lg 
+          max-h-[280px] overflow-y-auto p-1 min-w-[160px] focus:outline-none
+          animate-in fade-in-0 zoom-in-95"
       >
         <SelectGroup className="px-0.5">
           {MODEL_CONFIGS.map((model) => (
@@ -129,13 +134,15 @@ export function ModelSelector({ onModelChange, compact, isChatMode }: ModelSelec
               key={model.value} 
               value={model.value}
               className="group focus:bg-gray-50/70 rounded-lg py-0 outline-none 
-                data-[highlighted]:bg-gray-50/70 data-[highlighted]:outline-none
+                data-[highlighted]:bg-gradient-to-r data-[highlighted]:from-purple-500/20 data-[highlighted]:to-blue-500/20
+                data-[highlighted]:outline-none
                 focus:outline-none focus:ring-0 focus-visible:outline-none
-                focus-visible:ring-0"
+                focus-visible:ring-0 relative overflow-hidden"
             >
               <motion.div 
-                className="flex items-center gap-1.5 py-1 px-1.5 rounded-lg
-                  hover:bg-gray-50/70 transition-colors duration-150
+                className="flex items-center gap-1.5 py-1.5 px-2 rounded-lg
+                  hover:bg-gradient-to-r hover:from-purple-500/10 hover:to-blue-500/10 
+                  transition-colors duration-150
                   focus:outline-none"
                 whileHover={{ scale: 1.01 }}
                 transition={{ type: "spring", stiffness: 400, damping: 17 }}
@@ -146,7 +153,7 @@ export function ModelSelector({ onModelChange, compact, isChatMode }: ModelSelec
                   bgColor={`${model.bgColor} bg-opacity-60`} 
                 />
                 <div className="flex flex-col">
-                  <span className="text-[13px] font-medium text-gray-600 truncate">
+                  <span className="text-[13px] font-medium text-gray-700 truncate">
                     {model.provider} {model.label}
                   </span>
                 </div>

@@ -166,96 +166,152 @@ function ImagineContent() {
           px-3 sm:px-4 md:px-6 lg:px-8 py-0 sm:p-1 
           w-full max-w-[1600px] mx-auto">
           <Card className="flex-1 mx-0.5 my-0.5 sm:m-2 
-            bg-white/60 backdrop-blur-[10px] 
-            rounded-lg sm:rounded-[2rem] 
+            bg-white/60 backdrop-blur-[12px] 
+            rounded-2xl sm:rounded-[2rem] 
             border border-white/20 
-            shadow-[0_8px_40px_rgba(0,0,0,0.12)] 
+            shadow-[0_8px_40px_rgba(0,0,0,0.08)] 
             relative flex flex-col overflow-hidden
             w-full max-w-[1400px] mx-auto
-            h-[calc(100dvh-20px)] sm:h-[calc(98dvh-16px)]">
+            h-[calc(100dvh-20px)] sm:h-[calc(98dvh-16px)]
+            transition-all duration-500 ease-out">
             
-            <div className="absolute inset-0 rounded-[2rem] sm:rounded-[2.5rem] animate-glow">
-              <div className="absolute inset-0 rounded-[2rem] sm:rounded-[2.5rem] 
-                bg-gradient-to-r from-blue-500/20 via-purple-500/20 to-pink-500/20 
-                blur-xl opacity-50 animate-gradient-x">
-              </div>
+            <div className="absolute inset-0 rounded-[2rem] sm:rounded-[2.5rem]">
+              <motion.div 
+                className="absolute inset-0 rounded-[2rem] sm:rounded-[2.5rem] 
+                  bg-gradient-to-r from-blue-500/20 via-purple-500/20 to-pink-500/20 
+                  blur-2xl opacity-40"
+                animate={{
+                  backgroundPosition: ['0% 50%', '100% 50%', '0% 50%'],
+                }}
+                transition={{
+                  duration: 10,
+                  repeat: Infinity,
+                  ease: "linear"
+                }}
+              />
             </div>
 
-            {/* Content Area - keeping your existing grid layout */}
-            <div className="flex-1 overflow-y-auto p-4 relative z-10">
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 max-w-7xl mx-auto">
+            <div className="flex-1 overflow-y-auto overflow-x-hidden p-4 relative z-10
+              scrollbar-thin scrollbar-thumb-black/10 scrollbar-track-transparent
+              scroll-smooth">
+              <motion.div 
+                className="grid grid-cols-2 md:grid-cols-4 gap-4 max-w-7xl mx-auto"
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.5 }}
+              >
                 {isLoading && (
                   <motion.div
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    className="relative aspect-square rounded-xl overflow-hidden
+                    initial={{ opacity: 0, scale: 0.9 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    className="relative aspect-square rounded-2xl overflow-hidden
                       shadow-lg bg-white/50 backdrop-blur-sm border border-white/20
                       flex items-center justify-center"
                   >
                     <div className="absolute inset-0 bg-gradient-to-r from-blue-500/20 to-purple-500/20 animate-pulse" />
-                    <RefreshCw className="w-8 h-8 text-gray-400 animate-spin" />
+                    <motion.div
+                      animate={{ rotate: 360 }}
+                      transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
+                    >
+                      <RefreshCw className="w-8 h-8 text-gray-400" />
+                    </motion.div>
                   </motion.div>
                 )}
-                {generatedImages.map((imageUrl, index) => (
-                  <div
-                    key={`generated-${index}`}
-                    className="relative aspect-square rounded-xl overflow-hidden
-                      shadow-lg hover:shadow-xl transition-all duration-300
-                      bg-white/50 backdrop-blur-sm border border-white/20
-                      cursor-pointer group"
-                    onClick={() => {
-                      setSelectedImage(imageUrl);
-                      setSelectedImagePrompt(prompt);
-                    }}
-                  >
-                    <Image
-                      src={imageUrl}
-                      alt={`Generated image ${index + 1}`}
-                      fill
-                      priority={index < 4}
-                      className="object-cover group-hover:scale-105 transition-transform duration-300"
-                      sizes="(max-width: 768px) 50vw, 25vw"
-                    />
-                  </div>
-                ))}
-                {historyImages.map((imageSession, index) => (
-                  <div
-                    key={`history-${imageSession.id}`}
-                    className="relative aspect-square rounded-xl overflow-hidden
-                      shadow-lg hover:shadow-xl transition-all duration-300
-                      bg-white/50 backdrop-blur-sm border border-white/20
-                      cursor-pointer group"
-                    onClick={() => {
-                      setSelectedImage(imageSession.image_url);
-                      setSelectedImagePrompt(imageSession.prompt);
-                    }}
-                  >
-                    <Image
-                      src={imageSession.image_url}
-                      alt={`History image ${index + 1}`}
-                      fill
-                      priority={index < 4}
-                      className="object-cover group-hover:scale-105 transition-transform duration-300"
-                      sizes="(max-width: 768px) 50vw, 25vw"
-                    />
-                    <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                      <Button
-                        variant="destructive"
-                        size="icon"
-                        className="h-8 w-8 rounded-full bg-red-500/80 hover:bg-red-600 
-                          backdrop-blur-sm shadow-lg"
-                        onClick={(e) => handleDeleteImage(imageSession.id, e)}
+                
+                <AnimatePresence mode="popLayout">
+                  {generatedImages.map((imageUrl, index) => (
+                    <motion.div
+                      key={`generated-${index}`}
+                      initial={{ opacity: 0, scale: 0.9 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      exit={{ opacity: 0, scale: 0.9 }}
+                      transition={{ 
+                        duration: 0.3,
+                        delay: index * 0.1,
+                        ease: "easeOut"
+                      }}
+                      className="relative aspect-square rounded-2xl overflow-hidden
+                        shadow-lg hover:shadow-xl transition-all duration-300
+                        bg-white/50 backdrop-blur-sm border border-white/20
+                        cursor-pointer group"
+                      onClick={() => {
+                        setSelectedImage(imageUrl);
+                        setSelectedImagePrompt(prompt);
+                      }}
+                    >
+                      <Image
+                        src={imageUrl}
+                        alt={`Generated image ${index + 1}`}
+                        fill
+                        priority={index < 4}
+                        className="object-cover transform transition-all duration-500
+                          group-hover:scale-[1.02] will-change-transform"
+                        sizes="(max-width: 768px) 50vw, 25vw"
+                      />
+                      <div className="absolute inset-0 bg-gradient-to-b from-transparent 
+                        to-black/20 opacity-0 group-hover:opacity-100 
+                        transition-opacity duration-300" />
+                    </motion.div>
+                  ))}
+
+                  {historyImages.map((imageSession, index) => (
+                    <motion.div
+                      key={`history-${imageSession.id}`}
+                      initial={{ opacity: 0, scale: 0.9 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      exit={{ opacity: 0, scale: 0.9 }}
+                      transition={{ 
+                        duration: 0.3,
+                        delay: index * 0.05,
+                        ease: "easeOut"
+                      }}
+                      className="relative aspect-square rounded-2xl overflow-hidden
+                        shadow-lg hover:shadow-xl transition-all duration-300
+                        bg-white/50 backdrop-blur-sm border border-white/20
+                        cursor-pointer group"
+                      onClick={() => {
+                        setSelectedImage(imageSession.image_url);
+                        setSelectedImagePrompt(imageSession.prompt);
+                      }}
+                    >
+                      <Image
+                        src={imageSession.image_url}
+                        alt={`History image ${index + 1}`}
+                        fill
+                        priority={index < 4}
+                        className="object-cover transform transition-all duration-500
+                          group-hover:scale-[1.02] will-change-transform"
+                        sizes="(max-width: 768px) 50vw, 25vw"
+                      />
+                      <div className="absolute inset-0 bg-gradient-to-b from-transparent 
+                        to-black/20 opacity-0 group-hover:opacity-100 
+                        transition-opacity duration-300" />
+                      
+                      <motion.div 
+                        className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 
+                          transition-all duration-300 transform translate-y-2 
+                          group-hover:translate-y-0"
+                        whileHover={{ scale: 1.05 }}
+                        whileTap={{ scale: 0.95 }}
                       >
-                        <Trash2 className="h-4 w-4 text-white" />
-                      </Button>
-                    </div>
-                  </div>
-                ))}
-              </div>
+                        <Button
+                          variant="destructive"
+                          size="icon"
+                          className="h-8 w-8 rounded-full bg-red-500/80 hover:bg-red-600 
+                            backdrop-blur-sm shadow-lg"
+                          onClick={(e) => handleDeleteImage(imageSession.id, e)}
+                        >
+                          <Trash2 className="h-4 w-4 text-white" />
+                        </Button>
+                      </motion.div>
+                    </motion.div>
+                  ))}
+                </AnimatePresence>
+              </motion.div>
             </div>
 
-            {/* Input Area */}
-            <div className="border-t bg-transparent p-2 sm:p-4">
+            <div className="border-t border-white/10 bg-white/5 backdrop-blur-xl p-2 sm:p-4
+              transition-all duration-300">
               <form onSubmit={handleSubmit} className="max-w-2xl mx-auto">
                 <div className="relative group">
                   <motion.div
@@ -270,12 +326,10 @@ function ImagineContent() {
                     bg-white/10 backdrop-blur-md border border-white/20 
                     shadow-lg group-hover:shadow-xl transition-all duration-300">
                     
-                    {/* Your existing Textarea with updated styling */}
                     <Textarea
                       value={prompt}
                       onChange={(e) => {
                         setPrompt(e.target.value);
-                        // Your existing auto-resize logic stays the same
                         e.target.style.height = 'inherit';
                         const computed = window.getComputedStyle(e.target);
                         const height = parseInt(computed.getPropertyValue('border-top-width'), 10)
@@ -298,7 +352,6 @@ function ImagineContent() {
                       }}
                     />
                     
-                    {/* Your existing button area with updated styling */}
                     <div className="flex items-center justify-between p-3 
                       border-t border-white/10 bg-white/5">
                       <div className="flex items-center gap-3">

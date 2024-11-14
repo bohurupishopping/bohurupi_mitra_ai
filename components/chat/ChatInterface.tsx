@@ -322,26 +322,29 @@ export default function ChatInterface({ defaultMessage, sessionId, onModelChange
                     onClick={async () => {
                       try {
                         // Show confirmation dialog
-                        if (window.confirm('Are you sure you want to clear the chat?')) {
+                        if (window.confirm('Are you sure you want to clear this chat?')) {
                           // Clear messages from UI
                           setMessages([{
                             role: 'assistant',
                             content: "# Hello! 👋\n\nI'm your AI assistant. How can I help you today?"
                           }]);
 
-                          // Clear conversation history from database
+                          // If we have a sessionId, only delete that specific session
                           if (sessionId) {
                             await conversationService.deleteChatSession(sessionId);
+                            toast({
+                              title: "Chat Cleared",
+                              description: "This chat session has been cleared successfully.",
+                              duration: 3000,
+                            });
                           } else {
-                            await conversationService.clearConversationHistory();
+                            // If no sessionId (new chat), just clear the UI
+                            toast({
+                              title: "Chat Cleared",
+                              description: "Messages have been cleared from this chat.",
+                              duration: 3000,
+                            });
                           }
-
-                          // Show success toast
-                          toast({
-                            title: "Chat Cleared",
-                            description: "All messages have been cleared successfully.",
-                            duration: 3000,
-                          });
 
                           // Dispatch event to update any other components
                           window.dispatchEvent(new CustomEvent('chat-updated'));
@@ -350,7 +353,7 @@ export default function ChatInterface({ defaultMessage, sessionId, onModelChange
                         console.error('Error clearing chat:', error);
                         toast({
                           title: "Error",
-                          description: "Failed to clear chat history. Please try again.",
+                          description: "Failed to clear chat. Please try again.",
                           variant: "destructive",
                         });
                       }

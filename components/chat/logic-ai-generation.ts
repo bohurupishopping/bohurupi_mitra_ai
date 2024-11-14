@@ -34,8 +34,15 @@ export const useAIGeneration = (props?: UseAIGenerationProps) => {
 
   const buildContextualPrompt = async (newPrompt: string) => {
     try {
-      const recentMessages = await conversationService.getRecentConversations(5);
+      // Get the current session ID from the conversation service
+      const currentSessionId = conversationService.getSessionId();
       
+      // Load messages from current session instead of recent conversations
+      const sessionMessages = await conversationService.loadChatSession(currentSessionId);
+      
+      // Take last 5 messages for context
+      const recentMessages = sessionMessages.slice(-5);
+
       const context = recentMessages
         .map((msg: ChatMessage) => {
           return `${msg.role === 'user' ? 'User' : 'Assistant'}: ${msg.content}`;
@@ -43,12 +50,20 @@ export const useAIGeneration = (props?: UseAIGenerationProps) => {
         .join('\n\n');
 
       const contextualPrompt = context ? `
-Previous conversation history:
+You are an AI assistant having a conversation. Here is the relevant context from our current discussion:
+
 ${context}
 
 Current request: ${newPrompt}
 
-Based on our previous conversation, please provide an appropriate response. If I'm asking to modify something from our previous interaction, please refer to that and make the requested changes.` : newPrompt;
+Important instructions:
+1. Use the context above only if it's directly relevant to the current request
+2. If the user is asking about modifying or referring to something from our conversation, use the context to understand what they're referring to
+3. If the current request is starting a new topic, feel free to ignore the previous context
+4. Keep your response focused and relevant to the current request
+5. If you're unsure whether the context is relevant, prioritize responding to the current request directly
+
+Please provide an appropriate response.` : newPrompt;
 
       return contextualPrompt;
     } catch (error) {

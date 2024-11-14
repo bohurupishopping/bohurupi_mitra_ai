@@ -1,12 +1,14 @@
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 import type { Database } from '@/types/supabase';
 import { v4 as uuidv4 } from 'uuid';
+import { uploadImageToStorage, deleteImageFromStorage } from '@/utils/supabaseStorage';
 
 export interface ImageSession {
   id: string;
   session_id: string;
   prompt: string;
   image_url: string;
+  storage_path?: string;
   negative_prompt?: string | null;
   user_id?: string | null;
   timestamp: string;
@@ -27,18 +29,30 @@ export class ImageHistoryService {
     return ImageHistoryService.instance;
   }
 
-  async saveImage(prompt: string, imageUrl: string, negativePrompt?: string): Promise<void> {
+  async saveImage(prompt: string, togetherImageUrl: string, negativePrompt?: string): Promise<void> {
     try {
       const { data: { user } } = await this.supabase.auth.getUser();
-      
+      const sessionId = uuidv4();
+
+      // First, upload the image to Supabase Storage and get permanent URL
+      const permanentUrl = await uploadImageToStorage(togetherImageUrl, sessionId);
+      if (!permanentUrl) {
+        throw new Error('Failed to get public URL after upload');
+      }
+
+      const storagePath = `generated/${sessionId}-${Date.now()}.png`;
+
+      // Save to database with the permanent Supabase URL
       const { error } = await this.supabase
         .from('image_history')
         .insert({
-          session_id: uuidv4(),
+          session_id: sessionId,
           prompt,
-          image_url: imageUrl,
+          image_url: permanentUrl, // Use the permanent Supabase URL
+          storage_path: storagePath,
           negative_prompt: negativePrompt || null,
-          user_id: user?.id || null
+          user_id: user?.id || null,
+          timestamp: new Date().toISOString()
         });
 
       if (error) throw error;
@@ -62,7 +76,13 @@ export class ImageHistoryService {
 
       if (error) throw error;
 
-      return (data || []) as ImageSession[];
+      // Ensure we're using the permanent URLs from storage
+      const images = (data || []).map(image => ({
+        ...image,
+        image_url: image.image_url // This is now the permanent Supabase URL
+      })) as ImageSession[];
+
+      return images;
     } catch (error) {
       console.error('Error fetching image history:', error);
       throw error;
@@ -71,12 +91,40 @@ export class ImageHistoryService {
 
   async deleteImage(id: string): Promise<void> {
     try {
-      const { error } = await this.supabase
+      const { data: { user } } = await this.supabase.auth.getUser();
+      
+      if (!user?.id) {
+        throw new Error('User not authenticated');
+      }
+
+      // Get the storage path first
+      const { data: imageData, error: fetchError } = await this.supabase
+        .from('image_history')
+        .select('storage_path, session_id')
+        .eq('id', id)
+        .eq('user_id', user.id)
+        .single();
+
+      if (fetchError) throw fetchError;
+
+      // Delete from storage if path exists
+      if (imageData?.storage_path) {
+        try {
+          await deleteImageFromStorage(imageData.storage_path);
+        } catch (storageError) {
+          console.error('Error deleting from storage:', storageError);
+          // Continue with database deletion even if storage deletion fails
+        }
+      }
+
+      // Delete from database
+      const { error: dbError } = await this.supabase
         .from('image_history')
         .delete()
-        .eq('id', id);
+        .eq('id', id)
+        .eq('user_id', user.id);
 
-      if (error) throw error;
+      if (dbError) throw dbError;
       
       window.dispatchEvent(new CustomEvent('image-history-updated'));
     } catch (error) {

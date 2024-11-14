@@ -140,11 +140,26 @@ function ImagineContent() {
     e.stopPropagation();
     
     try {
+      toast({
+        title: "Deleting...",
+        description: "Please wait while we delete the image",
+      });
+
+      const imageToDelete = historyImages.find(img => img.id === id);
+      
       await imageHistoryServiceRef.current.deleteImage(id);
+
+      if (imageToDelete && selectedImage === imageToDelete.image_url) {
+        setSelectedImage(null);
+        setSelectedImagePrompt('');
+      }
+
       toast({
         title: "Success",
         description: "Image deleted successfully",
       });
+
+      await loadImageHistory();
     } catch (error) {
       console.error('Error deleting image:', error);
       toast({

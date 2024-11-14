@@ -38,8 +38,9 @@ export interface Database {
           session_id: string
           prompt: string
           image_url: string
-          negative_prompt?: string | null
-          user_id?: string | null
+          storage_path: string | null
+          negative_prompt: string | null
+          user_id: string | null
           timestamp: string
         }
         Insert: {
@@ -47,6 +48,7 @@ export interface Database {
           session_id: string
           prompt: string
           image_url: string
+          storage_path?: string | null
           negative_prompt?: string | null
           user_id?: string | null
           timestamp?: string
@@ -56,6 +58,7 @@ export interface Database {
           session_id?: string
           prompt?: string
           image_url?: string
+          storage_path?: string | null
           negative_prompt?: string | null
           user_id?: string | null
           timestamp?: string

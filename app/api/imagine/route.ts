@@ -3,11 +3,32 @@ import OpenAI from 'openai';
 
 type ImageSize = '1024x1024' | '1024x1792' | '1792x1024';
 
+// Define custom parameters interface for Together API
+interface TogetherImageGenerateParams {
+  model: string;
+  prompt: string;
+  negative_prompt?: string;
+  n?: number;
+  size?: string;
+  num_inference_steps?: number;
+  guidance_scale?: number;
+  seed?: number;
+  max_sequence_length?: number;
+  num_images_per_prompt?: number;
+  response_format?: string;
+}
+
 // Initialize the OpenAI client with Together's configuration
 const client = new OpenAI({
   apiKey: process.env.TOGETHER_API_KEY,
   baseURL: "https://api.together.xyz/v1",
-});
+}) as OpenAI & {
+  images: {
+    generate: (params: TogetherImageGenerateParams) => Promise<{
+      data: Array<{ url: string }>;
+    }>;
+  }
+};
 
 // Helper function for better prompt formatting
 const formatEnhancedPrompt = (
@@ -69,12 +90,19 @@ export async function POST(request: Request) {
 
     const { prompt: enhancedPrompt, negative_prompt } = formatEnhancedPrompt(prompt, size as ImageSize);
 
-    // Use the OpenAI client to generate image
+    // Use the OpenAI client to generate image with improved parameters
     const response = await client.images.generate({
       model: model,
       prompt: enhancedPrompt,
+      negative_prompt: negative_prompt,
       n: 1,
       size: size,
+      num_inference_steps: 30,
+      guidance_scale: 7.5,
+      seed: Math.floor(Math.random() * 2147483647),
+      max_sequence_length: 256,
+      num_images_per_prompt: 1,
+      response_format: 'url',
     });
 
     if (!response.data || response.data.length === 0) {

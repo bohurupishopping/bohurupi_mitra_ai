@@ -20,6 +20,14 @@ interface ModelSelectorProps {
 
 const MODEL_CONFIGS = [
   { 
+    provider: 'Groq',
+    value: 'groq',
+    label: 'Llama 3.2 90B',
+    icon: Zap,
+    color: 'text-yellow-500',
+    bgColor: 'bg-yellow-50',
+  },
+  { 
     provider: 'Google',
     value: 'gemini-1.5-pro',
     label: 'Gemini 1.5 Pro',
@@ -36,17 +44,9 @@ const MODEL_CONFIGS = [
     bgColor: 'bg-red-50',
   },
   { 
-    provider: 'Groq',
-    value: 'groq',
-    label: 'Llama 3.2 90B',
-    icon: Zap,
-    color: 'text-yellow-500',
-    bgColor: 'bg-yellow-50',
-  },
-  { 
     provider: 'Mistral',
     value: 'open-mistral-nemo',
-    label: 'Open Mistral Nemo',
+    label: 'Nemo',
     icon: Cpu,
     color: 'text-blue-500',
     bgColor: 'bg-blue-50',
@@ -54,7 +54,7 @@ const MODEL_CONFIGS = [
   { 
     provider: 'Mistral',
     value: 'mistral-large',
-    label: 'Mistral Large',
+    label: 'Large',
     icon: Brain,
     color: 'text-blue-600',
     bgColor: 'bg-blue-50',
@@ -94,51 +94,60 @@ const MODEL_CONFIGS = [
 ];
 
 export function ModelSelector({ onModelChange, compact, isChatMode }: ModelSelectorProps) {
+  React.useEffect(() => {
+    onModelChange('groq');
+  }, []);
+
   const IconComponent = ({ icon: Icon, color, bgColor }: { 
     icon: React.ElementType,
     color: string,
     bgColor: string
   }) => (
-    <div className={`p-1.5 rounded-lg ${bgColor}`}>
-      <Icon className={`h-3.5 w-3.5 ${color}`} />
+    <div className={`p-1 rounded-lg ${bgColor}`}>
+      <Icon className={`h-3 w-3 ${color}`} />
     </div>
   );
 
   return (
     <Select onValueChange={onModelChange}>
       <SelectTrigger 
-        className={`${compact ? 'w-[180px]' : 'w-[220px]'} 
-          bg-white/50 backdrop-blur-md border border-white/20
-          rounded-2xl shadow-sm hover:shadow-md transition-all duration-300
-          ${isChatMode ? 'h-10' : ''}`}
+        className={`${compact ? 'w-[160px]' : 'w-[180px]'} 
+          bg-white/80 backdrop-blur-sm border border-gray-100
+          rounded-xl shadow-sm hover:shadow-md transition-all duration-200
+          ${isChatMode ? 'h-9' : 'h-9'} px-3
+          focus:outline-none focus:ring-1 focus:ring-gray-100 focus:border-gray-200`}
       >
         <SelectValue placeholder="Select Model" />
       </SelectTrigger>
       <SelectContent 
-        className="rounded-xl bg-white/90 backdrop-blur-xl border-white/20 shadow-lg 
-          max-h-[300px] overflow-y-auto"
+        className="rounded-xl bg-white/95 backdrop-blur-xl border border-gray-100/60 shadow-lg 
+          max-h-[280px] overflow-y-auto p-0.5 min-w-[160px] focus:outline-none"
       >
-        <SelectGroup>
+        <SelectGroup className="px-0.5">
           {MODEL_CONFIGS.map((model) => (
             <SelectItem 
               key={model.value} 
               value={model.value}
-              className="group"
+              className="group focus:bg-gray-50/70 rounded-lg py-0 outline-none 
+                data-[highlighted]:bg-gray-50/70 data-[highlighted]:outline-none
+                focus:outline-none focus:ring-0 focus-visible:outline-none
+                focus-visible:ring-0"
             >
               <motion.div 
-                className="flex items-center gap-2 py-1.5 px-2 rounded-lg
-                  hover:bg-gray-50/50 transition-colors duration-200"
-                whileHover={{ scale: 1.02 }}
-                transition={{ type: "spring", stiffness: 400, damping: 10 }}
+                className="flex items-center gap-1.5 py-1 px-1.5 rounded-lg
+                  hover:bg-gray-50/70 transition-colors duration-150
+                  focus:outline-none"
+                whileHover={{ scale: 1.01 }}
+                transition={{ type: "spring", stiffness: 400, damping: 17 }}
               >
                 <IconComponent 
                   icon={model.icon} 
                   color={model.color} 
-                  bgColor={model.bgColor} 
+                  bgColor={`${model.bgColor} bg-opacity-60`} 
                 />
                 <div className="flex flex-col">
-                  <span className="text-xs font-medium text-gray-700">
-                    {model.provider} | {model.label}
+                  <span className="text-[13px] font-medium text-gray-600 truncate">
+                    {model.provider} {model.label}
                   </span>
                 </div>
               </motion.div>

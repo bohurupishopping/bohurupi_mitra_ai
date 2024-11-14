@@ -3,9 +3,9 @@ import { useToast } from "@/components/ui/use-toast";
 import { ConversationService } from '@/services/conversationService';
 import type { Message, DatabaseMessage } from '@/types/conversation';
 
-export const useAIGeneration = () => {
+export const useAIGeneration = (defaultModel: string = 'groq') => {
   const { toast } = useToast();
-  const [selectedModel, setSelectedModel] = useState('groq');
+  const [selectedModel, setSelectedModel] = useState(defaultModel);
   const [generatedContent, setGeneratedContent] = useState('');
   const conversationService = new ConversationService();
 

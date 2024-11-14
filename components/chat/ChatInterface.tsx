@@ -83,7 +83,7 @@ const stripHtmlAndFormatText = (html: string): string => {
 };
 
 export default function ChatInterface({ defaultMessage, sessionId, onModelChange }: ChatInterfaceProps) {
-  const { selectedModel, setSelectedModel, generateContent } = useAIGeneration();
+  const { selectedModel, setSelectedModel, generateContent } = useAIGeneration('groq');
   
   // When model changes, notify parent if callback exists
   const handleModelChange = (model: string) => {
@@ -113,7 +113,17 @@ export default function ChatInterface({ defaultMessage, sessionId, onModelChange
   const [isStoryRewriterOpen, setIsStoryRewriterOpen] = useState(false);
 
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    if (messagesEndRef.current) {
+      const scrollOptions: ScrollIntoViewOptions = {
+        behavior: 'smooth',
+        block: 'end',
+      };
+      
+      // Add a small delay to ensure smooth scrolling after content renders
+      setTimeout(() => {
+        messagesEndRef.current?.scrollIntoView(scrollOptions);
+      }, 100);
+    }
   }, [messages]);
 
   // Add new effect to load chat history when sessionId changes
@@ -398,10 +408,14 @@ export default function ChatInterface({ defaultMessage, sessionId, onModelChange
           <div 
             className="flex-1 overflow-y-auto scrollbar-thin scrollbar-thumb-blue-500/20 
               scrollbar-track-transparent hover:scrollbar-thumb-blue-500/30 
-              transition-colors duration-200
-              scroll-smooth"
+              transition-colors duration-200 scroll-smooth
+              overscroll-y-contain momentum-scroll
+              [-webkit-overflow-scrolling:touch]
+              [scroll-behavior:smooth]
+              will-change-scroll"
           >
-            <div className="p-2 sm:p-4 space-y-2 sm:space-y-3 relative z-10">
+            <div className="p-2 sm:p-4 space-y-2 sm:space-y-3 relative z-10 
+              [transform:translateZ(0)]">
               <AnimatePresence mode="popLayout">
                 {(searchQuery ? filteredMessages : messages).map((message, index) => (
                   <motion.div
@@ -418,7 +432,7 @@ export default function ChatInterface({ defaultMessage, sessionId, onModelChange
                     className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
                   >
                     <div className={`flex items-start space-x-1 sm:space-x-2 
-                      max-w-[85%] sm:max-w-[80%] 
+                      max-w-[92%] sm:max-w-[80%] 
                       ${message.role === 'user' ? 'flex-row-reverse space-x-reverse' : ''}`}>
                       <Avatar className="w-5 h-5 sm:w-8 sm:h-8 mt-0.5">
                         <AvatarImage 
@@ -426,24 +440,42 @@ export default function ChatInterface({ defaultMessage, sessionId, onModelChange
                           alt={message.role === 'user' ? "User" : "AI"} 
                         />
                       </Avatar>
-                      <div className="flex flex-col space-y-0.5">
+                      <div className="flex flex-col space-y-0.5 min-w-0">
                         <motion.div
                           initial={{ scale: 0.95 }}
                           animate={{ scale: 1 }}
-                          className={`px-2.5 sm:px-4 py-2 sm:py-3 rounded-xl sm:rounded-2xl 
+                          className={`px-2 sm:px-4 py-2 sm:py-3 rounded-xl sm:rounded-2xl 
+                            break-words overflow-hidden
                             ${message.role === 'user' 
                               ? 'bg-gradient-to-r from-blue-600 to-blue-500 text-white shadow-lg' 
                               : 'bg-white/50 backdrop-blur-[10px] border border-white/20 text-gray-900'
                             }`}
                         >
-                          <div className={`whitespace-pre-wrap break-words text-xs sm:text-sm ${
-                            message.role === 'user' ? 'text-white/90' : ''
-                          }`}>
+                          <div className={`whitespace-pre-wrap break-words text-xs sm:text-sm 
+                            ${message.role === 'user' ? 'text-white/90' : ''}`}>
                             {message.role === 'user' ? (
-                              <div className="text-white leading-relaxed">{message.content}</div>
+                              <div className="text-white leading-relaxed overflow-x-auto">
+                                {message.content}
+                              </div>
                             ) : (
-                              <div className="space-y-1">
-                                <ReactMarkdown>{message.content}</ReactMarkdown>
+                              <div className="space-y-1 overflow-x-auto">
+                                <ReactMarkdown
+                                  components={{
+                                    pre: ({ node, ...props }) => (
+                                      <div className="overflow-x-auto max-w-full">
+                                        <pre {...props} className="p-2 rounded bg-black/5 text-[0.8rem] sm:text-sm" />
+                                      </div>
+                                    ),
+                                    code: ({ node, ...props }) => (
+                                      <code {...props} className="break-all sm:break-normal text-[0.8rem] sm:text-sm" />
+                                    ),
+                                    p: ({ node, ...props }) => (
+                                      <p {...props} className="break-words" />
+                                    )
+                                  }}
+                                >
+                                  {message.content}
+                                </ReactMarkdown>
                               </div>
                             )}
                           </div>
@@ -582,7 +614,7 @@ export default function ChatInterface({ defaultMessage, sessionId, onModelChange
                       }}
                     />
                     
-                    <div className="flex items-center justify-between p-3 
+                    <div className="flex items-center justify-between p-2 sm:p-3 
                       border-t border-white/10 bg-white/5">
                       <div className="flex items-center gap-2">
                         <Button
@@ -621,7 +653,8 @@ export default function ChatInterface({ defaultMessage, sessionId, onModelChange
                           hover:from-purple-600 hover:to-blue-600 text-white
                           shadow-lg hover:shadow-xl transition-all duration-300
                           transform hover:-translate-y-0.5 hover:scale-105
-                          px-4 sm:px-6 py-2 text-sm font-medium"
+                          px-3 sm:px-5 py-2 text-sm font-medium
+                          mr-2 sm:mr-3"
                       >
                         <div className="flex items-center gap-2">
                           {isLoading ? (
@@ -629,7 +662,7 @@ export default function ChatInterface({ defaultMessage, sessionId, onModelChange
                           ) : (
                             <Send className="w-4 h-4" />
                           )}
-                          <span className="hidden sm:inline">
+                          <span className="text-xs sm:text-sm">
                             {isLoading ? "Sending..." : "Send"}
                           </span>
                         </div>

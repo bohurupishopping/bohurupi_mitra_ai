@@ -2,11 +2,9 @@ import { NextResponse } from 'next/server';
 import {
   DynamicRetrievalMode,
   GoogleGenerativeAI,
-  HarmCategory,
-  HarmBlockThreshold,
 } from "@google/generative-ai";
 
-// Initialize the Google AI client with proper error handling
+// Initialize the Google AI client
 const genAI = new GoogleGenerativeAI(process.env.GOOGLE_API_KEY || '');
 
 export async function POST(req: Request) {
@@ -18,67 +16,72 @@ export async function POST(req: Request) {
     }
 
     // Initialize the model with dynamic retrieval configuration
-    const model = genAI.getGenerativeModel({
-      model: "models/gemini-1.5-pro-002",  // Changed to gemini-pro as it's more stable
-      generationConfig: {
-        temperature: 0.7,
-        topK: 1,
-        topP: 0.8,
-        maxOutputTokens: 2048,
+    const model = genAI.getGenerativeModel(
+      {
+        model: "models/gemini-1.5-pro-002",
+        tools: [
+          {
+            googleSearchRetrieval: {
+              dynamicRetrievalConfig: {
+                mode: DynamicRetrievalMode.MODE_DYNAMIC,
+                dynamicThreshold: 0.7,
+              },
+            },
+          },
+        ],
       },
-      safetySettings: [
-        {
-          category: HarmCategory.HARM_CATEGORY_HARASSMENT,
-          threshold: HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE,
-        },
-        {
-          category: HarmCategory.HARM_CATEGORY_HATE_SPEECH,
-          threshold: HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE,
-        },
-        {
-          category: HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT,
-          threshold: HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE,
-        },
-        {
-          category: HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT,
-          threshold: HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE,
-        },
-      ],
-    });
+      { apiVersion: "v1beta" }
+    );
 
-    // Create a chat
-    const chat = model.startChat({
-      history: [],
-      generationConfig: {
-        maxOutputTokens: 2048,
-      },
-    });
+    try {
+      // Generate content with the prompt
+      const result = await model.generateContent(prompt);
+      
+      // Wait for the response
+      const response = await result.response;
+      
+      // Get the text content
+      const text = response.text();
 
-    // Generate content with the prompt
-    const result = await chat.sendMessage(prompt);
-    const response = await result.response;
-    
-    if (!response) {
-      throw new Error('No response generated');
+      // Get grounding metadata if available
+      const groundingMetadata = response.candidates?.[0]?.groundingMetadata;
+
+      // Return successful response
+      return NextResponse.json({ 
+        result: text,
+        groundingMetadata
+      });
+
+    } catch (generationError) {
+      console.error('Generation error:', generationError);
+      
+      // Try fallback to regular Gemini Pro if dynamic retrieval fails
+      const fallbackModel = genAI.getGenerativeModel({ model: "gemini-pro" });
+      const fallbackResult = await fallbackModel.generateContent(prompt);
+      const fallbackResponse = await fallbackResult.response;
+      
+      return NextResponse.json({ 
+        result: fallbackResponse.text(),
+        groundingMetadata: null,
+        fallback: true
+      });
     }
 
-    return NextResponse.json({ 
-      result: response.text(),
-      groundingMetadata: null // We'll add this feature once the basic chat is working
-    });
-
   } catch (error) {
-    console.error('Lively generation error:', error);
+    console.error('Lively generation error:', {
+      error,
+      message: error instanceof Error ? error.message : 'Unknown error',
+      stack: error instanceof Error ? error.stack : undefined
+    });
     
-    // Improved error handling with specific error messages
-    const errorMessage = error instanceof Error 
-      ? error.message 
-      : 'Failed to generate content';
-      
     return NextResponse.json(
       { 
-        error: errorMessage,
-        details: process.env.NODE_ENV === 'development' ? error : undefined
+        error: error instanceof Error ? error.message : 'Failed to generate content',
+        details: process.env.NODE_ENV === 'development' ? {
+          message: error instanceof Error ? error.message : 'Unknown error',
+          stack: error instanceof Error ? error.stack : undefined,
+          raw: error
+        } : undefined
       },
       { status: 500 }
     );

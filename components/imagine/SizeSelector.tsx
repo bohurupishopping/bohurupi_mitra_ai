@@ -48,34 +48,34 @@ export default function SizeSelector({ onSizeChange }: SizeSelectorProps) {
         <Button
           variant="outline"
           size="sm"
-          className="flex items-center gap-2 px-3 py-2 
+          className="flex items-center gap-1.5 h-8 px-2.5 
             bg-white/10 backdrop-blur-md border border-white/20
             hover:bg-white/20 transition-all duration-300
-            rounded-xl text-sm font-medium text-gray-700"
+            rounded-xl text-xs font-medium text-gray-700"
         >
-          <span className="text-sm font-medium">{selectedSizeData?.name}</span>
-          <ChevronDown className="h-4 w-4 text-gray-500" />
+          <span className="text-xs">{selectedSizeData?.name}</span>
+          <ChevronDown className="h-3.5 w-3.5 text-gray-500" />
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent
         align="end"
-        className="w-[180px] rounded-xl bg-white/90 backdrop-blur-xl
-          border-white/20 shadow-lg"
+        className="w-[140px] rounded-xl bg-white/90 backdrop-blur-xl
+          border-white/20 shadow-lg p-1"
       >
         {sizes.map((size) => (
           <DropdownMenuItem
             key={size.id}
             onClick={() => handleSizeSelect(size.id)}
-            className="flex items-center justify-between px-3 py-2
-              text-sm cursor-pointer hover:bg-gray-100/50
-              transition-colors duration-200"
+            className="flex items-center justify-between px-2 py-1.5
+              text-xs cursor-pointer hover:bg-gray-100/50
+              transition-colors duration-200 rounded-lg"
           >
-            <div className="flex flex-col">
+            <div className="flex flex-col gap-0.5">
               <span className="font-medium">{size.name}</span>
-              <span className="text-xs text-gray-500">{size.description}</span>
+              <span className="text-[10px] text-gray-500">{size.description}</span>
             </div>
             {selectedSize === size.id && (
-              <Check className="h-4 w-4 text-blue-500" />
+              <Check className="h-3.5 w-3.5 text-blue-500" />
             )}
           </DropdownMenuItem>
         ))}

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, Suspense, useEffect } from 'react';
+import { useState, Suspense, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Send, ImageIcon, RefreshCw, Sparkles, Trash2 } from 'lucide-react';
 import { Button } from "@/components/ui/button";
@@ -12,8 +12,7 @@ import ModelSelector from '@/components/imagine/ModelSelector';
 import Image from 'next/image';
 import ImagePreview from '@/components/imagine/ImagePreview';
 import SizeSelector from '@/components/imagine/SizeSelector';
-import { ImageHistoryService } from '@/services/imageHistoryService';
-import type { ImageSession } from '@/services/imageHistoryService';
+import { ImageHistoryService, type ImageSession } from '@/services/imageHistoryService';
 
 function ImagineContent() {
   const [prompt, setPrompt] = useState('');
@@ -26,7 +25,7 @@ function ImagineContent() {
   const [isEnhancing, setIsEnhancing] = useState(false);
   const [selectedSize, setSelectedSize] = useState('1024x1024');
   const { toast } = useToast();
-  const [imageHistoryService] = useState(() => ImageHistoryService.getInstance());
+  const imageHistoryServiceRef = useRef(ImageHistoryService.getInstance());
   const [historyImages, setHistoryImages] = useState<ImageSession[]>([]);
   const [selectedImagePrompt, setSelectedImagePrompt] = useState<string>('');
 
@@ -45,7 +44,7 @@ function ImagineContent() {
 
   const loadImageHistory = async () => {
     try {
-      const history = await imageHistoryService.getImageHistory();
+      const history = await imageHistoryServiceRef.current.getImageHistory();
       setHistoryImages(history);
     } catch (error) {
       console.error('Error loading image history:', error);
@@ -113,10 +112,10 @@ function ImagineContent() {
 
       if (data.success && data.data[0]?.url) {
         const imageUrl = data.data[0].url;
-        setGeneratedImages(prev => [imageUrl, ...prev]);
         setGeneratedImage(imageUrl);
         
-        await imageHistoryService.saveImage(prompt, imageUrl);
+        await imageHistoryServiceRef.current.saveImage(prompt, imageUrl);
+        await loadImageHistory();
         
         toast({
           title: "Success",
@@ -141,7 +140,7 @@ function ImagineContent() {
     e.stopPropagation();
     
     try {
-      await imageHistoryService.deleteImage(id);
+      await imageHistoryServiceRef.current.deleteImage(id);
       toast({
         title: "Success",
         description: "Image deleted successfully",
@@ -250,11 +249,6 @@ function ImagineContent() {
                         <Trash2 className="h-4 w-4 text-white" />
                       </Button>
                     </div>
-                    <div className="absolute bottom-0 left-0 right-0 p-2 bg-black/50 
-                      backdrop-blur-sm text-white text-sm opacity-0 group-hover:opacity-100 
-                      transition-opacity">
-                      {imageSession.prompt}
-                    </div>
                   </div>
                 ))}
               </div>
@@ -308,7 +302,6 @@ function ImagineContent() {
                     <div className="flex items-center justify-between p-3 
                       border-t border-white/10 bg-white/5">
                       <div className="flex items-center gap-3">
-                        <ImageIcon className="w-5 h-5 text-gray-500" />
                         <ModelSelector onModelChange={setSelectedModel} />
                         <SizeSelector onSizeChange={setSelectedSize} />
                         <motion.div
@@ -366,7 +359,7 @@ function ImagineContent() {
                             hover:from-purple-600 hover:to-blue-600 text-white
                             shadow-lg hover:shadow-xl transition-all duration-300
                             transform hover:-translate-y-0.5 hover:scale-105
-                            px-4 sm:px-6 py-2 text-sm font-medium relative overflow-hidden"
+                            px-4 py-2 text-sm font-medium relative overflow-hidden"
                         >
                           <div className="flex items-center gap-2">
                             <motion.div
@@ -385,7 +378,7 @@ function ImagineContent() {
                                 <Send className="w-4 h-4" />
                               )}
                             </motion.div>
-                            <span className="hidden sm:inline">
+                            <span>
                               {isLoading ? "Generating..." : "Generate"}
                             </span>
                           </div>

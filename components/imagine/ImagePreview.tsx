@@ -123,11 +123,6 @@ export default function ImagePreview({ src, alt, prompt, onClose }: ImagePreview
               <X className="h-4 w-4" />
             </Button>
           </div>
-
-          <div className="absolute bottom-4 left-4 right-4 p-4 
-            bg-white/10 backdrop-blur-md rounded-xl border border-white/20">
-            <p className="text-sm text-white/90">{prompt}</p>
-          </div>
         </div>
       </div>
     </motion.div>

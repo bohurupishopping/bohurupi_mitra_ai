@@ -1,22 +1,24 @@
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
-import { v4 as uuidv4 } from 'uuid';
 import type { Database } from '@/types/supabase';
+import { v4 as uuidv4 } from 'uuid';
 
 export interface ImageSession {
   id: string;
   session_id: string;
-  image_url: string;
   prompt: string;
-  negative_prompt: string | null;
+  image_url: string;
+  negative_prompt?: string | null;
+  user_id?: string | null;
   timestamp: string;
-  user_id: string | null;
 }
 
 export class ImageHistoryService {
   private static instance: ImageHistoryService;
-  private supabase = createClientComponentClient<Database>();
+  private supabase;
 
-  private constructor() {}
+  private constructor() {
+    this.supabase = createClientComponentClient<Database>();
+  }
 
   public static getInstance(): ImageHistoryService {
     if (!ImageHistoryService.instance) {

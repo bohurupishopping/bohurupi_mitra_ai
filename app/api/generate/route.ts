@@ -44,13 +44,27 @@ export async function POST(req: Request) {
 
     let result;
 
-    // Handle Google AI models
+    // Handle Google AI models with streaming for Gemini 1.5 Pro
     if (model.startsWith('gemini-')) {
-      const modelName = model; // e.g. 'gemini-1.5-pro' or 'gemini-1.5-flash'
+      const modelName = model;
       const googleModel = googleAI.getGenerativeModel({ model: modelName });
       
-      const response = await googleModel.generateContent(prompt);
-      result = response.response.text();
+      if (model === 'gemini-1.5-pro') {
+        // Use streaming for Gemini 1.5 Pro
+        const response = await googleModel.generateContentStream(prompt);
+        let fullText = '';
+        
+        for await (const chunk of response.stream) {
+          const chunkText = chunk.text();
+          fullText += chunkText;
+        }
+        
+        result = fullText;
+      } else {
+        // Use regular generation for other Gemini models
+        const response = await googleModel.generateContent(prompt);
+        result = response.response.text();
+      }
     }
     // Handle Together AI models
     else if (model.startsWith('together/')) {

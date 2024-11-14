@@ -9,33 +9,56 @@ export type Json =
 export interface Database {
   public: {
     Tables: {
+      user_profiles: {
+        Row: {
+          id: string
+          user_id: string
+          display_name: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          display_name?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          display_name?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+      }
       image_history: {
         Row: {
           id: string
           session_id: string
           prompt: string
-          negative_prompt: string | null
           image_url: string
+          negative_prompt?: string | null
+          user_id?: string | null
           timestamp: string
-          user_id: string | null
         }
         Insert: {
           id?: string
           session_id: string
           prompt: string
-          negative_prompt?: string | null
           image_url: string
-          timestamp?: string
+          negative_prompt?: string | null
           user_id?: string | null
+          timestamp?: string
         }
         Update: {
           id?: string
           session_id?: string
           prompt?: string
-          negative_prompt?: string | null
           image_url?: string
-          timestamp?: string
+          negative_prompt?: string | null
           user_id?: string | null
+          timestamp?: string
         }
       }
     }

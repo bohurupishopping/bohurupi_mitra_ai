@@ -34,6 +34,8 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { ConversationService, ChatSession } from '@/services/conversationService';
+import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
+import { Database } from '@/types/supabase';
 
 interface SidebarProps {
   isOpen: boolean;
@@ -52,6 +54,7 @@ export default function Sidebar({ isOpen, onToggle }: SidebarProps) {
   const [chatSessions, setChatSessions] = useState<ChatSession[]>([]);
   const [conversationService] = useState(() => new ConversationService(currentSessionId || undefined));
   const [userProfile, setUserProfile] = useState<{ display_name: string | null }>({ display_name: null });
+  const supabase = createClientComponentClient<Database>();
 
   const loadChatSessions = useCallback(async () => {
     try {
@@ -98,6 +101,34 @@ export default function Sidebar({ isOpen, onToggle }: SidebarProps) {
     window.addEventListener('chat-updated', loadChatSessions);
     return () => window.removeEventListener('chat-updated', loadChatSessions);
   }, [loadChatSessions]);
+
+  useEffect(() => {
+    const fetchUserProfile = async () => {
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user) {
+          const { data: profile, error } = await supabase
+            .from('user_profiles')
+            .select('display_name')
+            .eq('user_id', user.id)
+            .single();
+
+          if (error) {
+            console.error('Error fetching user profile:', error);
+            return;
+          }
+
+          if (profile) {
+            setUserProfile({ display_name: profile.display_name });
+          }
+        }
+      } catch (error) {
+        console.error('Error fetching user data:', error);
+      }
+    };
+
+    fetchUserProfile();
+  }, [supabase]);
 
   const handleDeleteSession = async (sessionId: string) => {
     try {
@@ -167,12 +198,35 @@ export default function Sidebar({ isOpen, onToggle }: SidebarProps) {
   ];
 
   const handleSignOut = async () => {
-    // Implement your sign out logic here
-    router.push("/login");
-    toast({
-      title: "Signed out",
-      description: "Successfully signed out of your account",
-    });
+    try {
+      const supabase = createClientComponentClient();
+      const { error } = await supabase.auth.signOut();
+      
+      if (error) {
+        throw error;
+      }
+
+      // Clear any local storage or state if needed
+      localStorage.clear();
+      
+      // Show success toast
+      toast({
+        title: "Signed out successfully",
+        description: "You have been logged out of your account",
+      });
+
+      // Redirect to login page
+      router.push("/login");
+      router.refresh(); // Refresh to ensure auth state is updated
+      
+    } catch (error) {
+      console.error('Error signing out:', error);
+      toast({
+        title: "Error signing out",
+        description: "There was a problem signing out. Please try again.",
+        variant: "destructive",
+      });
+    }
   };
 
   return (
@@ -278,136 +332,145 @@ export default function Sidebar({ isOpen, onToggle }: SidebarProps) {
         </div>
 
         {/* Navigation Menu */}
-        <nav className="flex-1 px-3 py-2 space-y-2 overflow-y-auto scrollbar-thin scrollbar-thumb-gray-200 hover:scrollbar-thumb-gray-300">
-          {menuItems.map((item) => (
-            <Button
-              key={item.label}
-              variant="ghost"
-              className={`w-full flex items-center ${
-                isCollapsed ? 'justify-center' : 'justify-start'
-              } gap-3 px-4 py-3 rounded-2xl transition-all duration-300 
-              hover:bg-white/40 hover:shadow-md
-              ${pathname === item.href
-                ? 'bg-white/50 text-gray-900 shadow-md'
-                : 'text-gray-700'}`}
-              onClick={() => router.push(item.href)}
-            >
-              <item.icon className={`h-5 w-5 ${item.color}`} />
-              <AnimatePresence>
-                {!isCollapsed && (
-                  <motion.div
-                    initial={{ opacity: 0, x: -10 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    exit={{ opacity: 0, x: -10 }}
-                    className="flex flex-col items-start"
-                  >
-                    <span className="text-sm font-medium">{item.label}</span>
-                    <span className="text-xs text-gray-500">{item.description}</span>
-                  </motion.div>
-                )}
-              </AnimatePresence>
-            </Button>
-          ))}
-
-          {/* Chat History */}
-          <div className="px-2 py-4 border-t border-gray-200/30">
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-xs font-medium text-gray-500">Recent Chats</span>
-              {!isCollapsed && chatSessions.length > 0 && (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="text-xs text-gray-500 hover:text-gray-700"
-                  onClick={() => router.push('/chat')}
-                >
-                  View All
-                </Button>
-              )}
-            </div>
-            <AnimatePresence>
-              {chatSessions.map((session, index) => {
-                const colors = [
-                  'text-blue-400',
-                  'text-purple-400',
-                  'text-pink-400',
-                  'text-indigo-400',
-                  'text-teal-400',
-                  'text-cyan-400',
-                  'text-green-400'
-                ];
-                const colorClass = colors[index % colors.length];
-
-                return (
-                  <motion.div
-                    key={session.session_id}
-                    initial={{ opacity: 0, y: 5 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: -5 }}
-                    className="mb-1.5"
-                  >
-                    <div className={`group relative p-2 rounded-xl 
-                      hover:bg-gradient-to-r hover:from-gray-50 hover:to-gray-100/50
-                      transition-all duration-300 cursor-pointer
-                      hover:shadow-sm
-                      ${session.session_id === currentSessionId ? 'bg-white/50' : ''}`}
+        <nav className="flex flex-col h-[calc(100%-140px)]">
+          <div className="px-3 py-2 space-y-2">
+            {menuItems.map((item) => (
+              <Button
+                key={item.label}
+                variant="ghost"
+                className={`w-full flex items-center ${
+                  isCollapsed ? 'justify-center' : 'justify-start'
+                } gap-3 px-4 py-3 rounded-2xl transition-all duration-300 
+                hover:bg-white/40 hover:shadow-md
+                ${pathname === item.href
+                  ? 'bg-white/50 text-gray-900 shadow-md'
+                  : 'text-gray-700'}`}
+                onClick={() => router.push(item.href)}
+              >
+                <item.icon className={`h-5 w-5 ${item.color}`} />
+                <AnimatePresence>
+                  {!isCollapsed && (
+                    <motion.div
+                      initial={{ opacity: 0, x: -10 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      exit={{ opacity: 0, x: -10 }}
+                      className="flex flex-col items-start"
                     >
-                      <div className="flex items-center justify-between">
-                        <div 
-                          className="flex items-center space-x-2 flex-1"
-                          onClick={() => handleViewSession(session.session_id)}
-                        >
-                          <MessageSquare className={`h-4 w-4 ${colorClass} transition-transform duration-300 group-hover:scale-110`} />
-                          {!isCollapsed && (
-                            <div className="flex flex-col">
-                              <span className="text-sm font-medium text-gray-700 truncate max-w-[120px] group-hover:text-gray-900">
-                                {session.last_message}
-                              </span>
-                              <span className="text-xs text-gray-500">
-                                {session.message_count} messages • {session.timestamp}
-                              </span>
+                      <span className="text-sm font-medium">{item.label}</span>
+                      <span className="text-xs text-gray-500">{item.description}</span>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </Button>
+            ))}
+          </div>
+
+          {/* Chat History - Updated Section with Fixed Height */}
+          <div className="flex-1 flex flex-col">
+            <div className="px-5 py-3 border-t border-gray-200/30">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-xs font-medium text-gray-500">Recent Chats</span>
+                {!isCollapsed && chatSessions.length > 0 && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="text-xs text-gray-500 hover:text-gray-700"
+                    onClick={() => router.push('/chat')}
+                  >
+                    View All
+                  </Button>
+                )}
+              </div>
+            </div>
+            <div className="h-[280px] overflow-y-auto scrollbar-thin scrollbar-track-transparent 
+              scrollbar-thumb-gray-300 hover:scrollbar-thumb-gray-400 px-3 pb-2">
+              <AnimatePresence>
+                {chatSessions.map((session, index) => {
+                  const colors = [
+                    'text-blue-400',
+                    'text-purple-400',
+                    'text-pink-400',
+                    'text-indigo-400',
+                    'text-teal-400',
+                    'text-cyan-400',
+                    'text-green-400'
+                  ];
+                  const colorClass = colors[index % colors.length];
+
+                  return (
+                    <motion.div
+                      key={session.session_id}
+                      initial={{ opacity: 0, y: 5 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: -5 }}
+                      className="mb-1.5"
+                    >
+                      <div className={`group relative p-2.5 rounded-xl 
+                        hover:bg-gradient-to-r hover:from-gray-50/80 hover:to-gray-100/50
+                        transition-all duration-300 cursor-pointer
+                        hover:shadow-sm backdrop-blur-sm
+                        ${session.session_id === currentSessionId ? 'bg-white/60 shadow-sm' : ''}`}
+                      >
+                        <div className="flex items-center justify-between">
+                          <div 
+                            className="flex items-center space-x-2.5 flex-1"
+                            onClick={() => handleViewSession(session.session_id)}
+                          >
+                            <div className={`p-2 rounded-xl bg-white/50 ${session.session_id === currentSessionId ? 'shadow-sm' : ''}`}>
+                              <MessageSquare className={`h-4 w-4 ${colorClass} transition-transform duration-300 group-hover:scale-110`} />
                             </div>
+                            {!isCollapsed && (
+                              <div className="flex flex-col">
+                                <span className="text-sm font-medium text-gray-700 truncate max-w-[120px] group-hover:text-gray-900">
+                                  {session.last_message}
+                                </span>
+                                <span className="text-xs text-gray-500">
+                                  {session.message_count} messages • {session.timestamp}
+                                </span>
+                              </div>
+                            )}
+                          </div>
+                          {!isCollapsed && (
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <Button 
+                                  variant="ghost" 
+                                  size="icon" 
+                                  className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity duration-200"
+                                >
+                                  <MoreHorizontal className="h-4 w-4" />
+                                </Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end" className="w-40">
+                                <DropdownMenuItem 
+                                  onClick={() => handleViewSession(session.session_id)}
+                                  className="text-gray-600 hover:text-gray-900"
+                                >
+                                  <Eye className="mr-2 h-4 w-4" />
+                                  View Chat
+                                </DropdownMenuItem>
+                                <DropdownMenuItem 
+                                  onClick={() => handleDeleteSession(session.session_id)}
+                                  className="text-red-600 hover:text-red-700"
+                                >
+                                  <Trash2 className="mr-2 h-4 w-4" />
+                                  Delete
+                                </DropdownMenuItem>
+                              </DropdownMenuContent>
+                            </DropdownMenu>
                           )}
                         </div>
-                        {!isCollapsed && (
-                          <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                              <Button 
-                                variant="ghost" 
-                                size="icon" 
-                                className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity duration-200"
-                              >
-                                <MoreHorizontal className="h-4 w-4" />
-                              </Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end" className="w-40">
-                              <DropdownMenuItem 
-                                onClick={() => handleViewSession(session.session_id)}
-                                className="text-gray-600 hover:text-gray-900"
-                              >
-                                <Eye className="mr-2 h-4 w-4" />
-                                View Chat
-                              </DropdownMenuItem>
-                              <DropdownMenuItem 
-                                onClick={() => handleDeleteSession(session.session_id)}
-                                className="text-red-600 hover:text-red-700"
-                              >
-                                <Trash2 className="mr-2 h-4 w-4" />
-                                Delete
-                              </DropdownMenuItem>
-                            </DropdownMenuContent>
-                          </DropdownMenu>
-                        )}
                       </div>
-                    </div>
-                  </motion.div>
-                );
-              })}
-            </AnimatePresence>
+                    </motion.div>
+                  );
+                })}
+              </AnimatePresence>
+            </div>
           </div>
         </nav>
 
-        {/* User Profile Section */}
-        <div className={`border-t border-white/20 p-3 bg-white/10 backdrop-blur-sm
+        {/* User Profile Section - Will now stay fixed at bottom */}
+        <div className={`mt-auto border-t border-white/20 p-3 bg-white/10 backdrop-blur-sm
           ${isMobile ? 'pb-safe-area-inset-bottom' : ''}`}>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>

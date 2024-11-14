@@ -14,7 +14,7 @@ export class LivelyService extends ConversationService {
     prompt: string, 
     response: string, 
     groundingMetadata?: any
-  ): Promise<void> {
+  ): Promise<string> {
     try {
       const { data: { user } } = await supabase.auth.getUser();
       
@@ -35,6 +35,8 @@ export class LivelyService extends ConversationService {
         });
 
       if (error) throw error;
+      
+      return response; // Return the response string to match the parent class signature
     } catch (error) {
       console.error('Error saving lively conversation:', error);
       throw error;

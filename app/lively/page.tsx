@@ -1,10 +1,21 @@
 "use client";
 
-import { useState } from 'react';
+import { useState, Suspense } from 'react';
 import LivelyChatInterface from '@/components/lively/LivelyChatInterface';
 import Sidebar from '@/components/shared/Sidebar';
+import { Loader2 } from 'lucide-react';
 
-export default function LivelyPage() {
+// Create a loading component
+function LoadingFallback() {
+  return (
+    <div className="h-screen w-full flex items-center justify-center">
+      <Loader2 className="h-8 w-8 animate-spin text-blue-500" />
+    </div>
+  );
+}
+
+// Wrap the main content in a separate component
+function LivelyContent() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
   return (
@@ -19,5 +30,14 @@ export default function LivelyPage() {
         />
       </main>
     </div>
+  );
+}
+
+// Main page component with Suspense boundary
+export default function LivelyPage() {
+  return (
+    <Suspense fallback={<LoadingFallback />}>
+      <LivelyContent />
+    </Suspense>
   );
 } 

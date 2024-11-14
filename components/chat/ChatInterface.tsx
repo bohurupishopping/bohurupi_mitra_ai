@@ -16,6 +16,7 @@ import ReactMarkdown from 'react-markdown';
 import { useAIGeneration } from './logic-ai-generation';
 import { StoryCreationPopup } from './StoryCreationPopup';
 import { StoryRewriterPopup } from './StoryRewriterPopup';
+import { ChatMessage } from '@/services/conversationService';
 
 interface Message {
   role: 'user' | 'assistant';
@@ -83,7 +84,11 @@ const stripHtmlAndFormatText = (html: string): string => {
 };
 
 export default function ChatInterface({ defaultMessage, sessionId, onModelChange }: ChatInterfaceProps) {
-  const { selectedModel, setSelectedModel, generateContent } = useAIGeneration('groq');
+  const [conversationService] = useState(() => new ConversationService(sessionId));
+  const { selectedModel, setSelectedModel, generateContent } = useAIGeneration({ 
+    conversationService,
+    defaultModel: 'groq'
+  });
   
   // When model changes, notify parent if callback exists
   const handleModelChange = (model: string) => {
@@ -93,7 +98,7 @@ export default function ChatInterface({ defaultMessage, sessionId, onModelChange
     }
   };
 
-  const [messages, setMessages] = useState<Message[]>([{
+  const [messages, setMessages] = useState<ChatMessage[]>([{
     role: 'assistant',
     content: defaultMessage || "# Hello! 👋\n\nI'm your AI assistant. How can I help you today?"
   }]);
@@ -107,7 +112,6 @@ export default function ChatInterface({ defaultMessage, sessionId, onModelChange
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
-  const [conversationService] = useState(() => new ConversationService(sessionId));
   const [attachments, setAttachments] = useState<FileUpload[]>([]);
   const [isStoryCreatorOpen, setIsStoryCreatorOpen] = useState(false);
   const [isStoryRewriterOpen, setIsStoryRewriterOpen] = useState(false);

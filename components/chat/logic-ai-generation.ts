@@ -1,13 +1,21 @@
 import { useState, useCallback } from 'react';
 import { useToast } from "@/components/ui/use-toast";
-import { ConversationService } from '@/services/conversationService';
-import type { Message, DatabaseMessage } from '@/types/conversation';
+import { ConversationService, ChatMessage } from '@/services/conversationService';
 
-export const useAIGeneration = (defaultModel: string = 'groq') => {
+interface UseAIGenerationProps {
+  conversationService?: ConversationService;
+  defaultModel?: string;
+}
+
+export const useAIGeneration = (props?: UseAIGenerationProps) => {
+  const { 
+    conversationService = new ConversationService(), 
+    defaultModel = 'groq' 
+  } = props || {};
+  
   const { toast } = useToast();
   const [selectedModel, setSelectedModel] = useState(defaultModel);
   const [generatedContent, setGeneratedContent] = useState('');
-  const conversationService = new ConversationService();
 
   const getModelDisplayName = (modelId: string) => {
     const modelMap: { [key: string]: string } = {
@@ -29,27 +37,20 @@ export const useAIGeneration = (defaultModel: string = 'groq') => {
       const recentMessages = await conversationService.getRecentConversations(5);
       
       const context = recentMessages
-        .reverse()
-        .map((msg: Message | DatabaseMessage) => {
-          if ('role' in msg) {
-            return `${msg.role === 'user' ? 'User' : 'Assistant'}: ${msg.content}`;
-          } else if ('prompt' in msg) {
-            return `User: ${msg.prompt}\nAssistant: ${msg.response}`;
-          }
-          return '';
+        .map((msg: ChatMessage) => {
+          return `${msg.role === 'user' ? 'User' : 'Assistant'}: ${msg.content}`;
         })
-        .filter(Boolean)
         .join('\n\n');
 
-      const contextualPrompt = `
+      const contextualPrompt = context ? `
 Previous conversation history:
 ${context}
 
 Current request: ${newPrompt}
 
-Based on our previous conversation, please provide an appropriate response. If I'm asking to modify something from our previous interaction, please refer to that and make the requested changes.`;
+Based on our previous conversation, please provide an appropriate response. If I'm asking to modify something from our previous interaction, please refer to that and make the requested changes.` : newPrompt;
 
-      return context ? contextualPrompt : newPrompt;
+      return contextualPrompt;
     } catch (error) {
       console.error('Error building contextual prompt:', error);
       return newPrompt;
@@ -83,7 +84,7 @@ Based on our previous conversation, please provide an appropriate response. If I
           model: currentModel,
           prompt: contextualPrompt,
           options,
-          isModelQuery // Pass this to the API
+          isModelQuery
         }),
       });
 
@@ -144,7 +145,7 @@ Based on our previous conversation, please provide an appropriate response. If I
 
   return {
     selectedModel,
-    setSelectedModel: handleModelChange, // Use the new handler instead of direct setState
+    setSelectedModel: handleModelChange,
     generatedContent,
     generateContent
   };

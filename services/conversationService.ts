@@ -1,7 +1,8 @@
 "use client";
 
-import { supabase } from '@/lib/supabase';
+import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 import { v4 as uuidv4 } from 'uuid';
+import type { DatabaseMessage } from '@/types/conversation';
 
 export interface ChatSession {
   session_id: string;
@@ -10,115 +11,120 @@ export interface ChatSession {
   message_count: number;
 }
 
-export interface Message {
+export interface ChatMessage {
   role: 'user' | 'assistant';
   content: string;
   timestamp?: string;
 }
 
 export class ConversationService {
+  private supabase;
   private sessionId: string;
-  private userId: string | null = null;
 
   constructor(sessionId?: string) {
+    this.supabase = createClientComponentClient();
     this.sessionId = sessionId || uuidv4();
-    this.initializeUserId();
-  }
-
-  private async initializeUserId() {
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
-      this.userId = user?.id || null;
-    } catch (error) {
-      console.error('Error getting user:', error);
-      this.userId = null;
-    }
   }
 
   private async getCurrentUser() {
-    const { data: { user } } = await supabase.auth.getUser();
-    return user;
+    try {
+      const { data: { session }, error } = await this.supabase.auth.getSession();
+      if (error) throw error;
+      return session?.user || null;
+    } catch (error) {
+      console.error('Error getting current user:', error);
+      return null;
+    }
   }
 
-  async saveConversation(prompt: string, response: string): Promise<void> {
+  async saveConversation(prompt: string, response: string) {
     try {
       const user = await this.getCurrentUser();
-      
-      const { error } = await supabase
+      const messageId = uuidv4();
+
+      const { error } = await this.supabase
         .from('conversations')
-        .insert({
-          session_id: this.sessionId,
-          message_id: uuidv4(),
-          prompt,
-          response,
-          timestamp: new Date().toISOString(),
-          metadata: {},
-          is_deleted: false,
-          user_id: user?.id || null
-        });
+        .insert([
+          {
+            session_id: this.sessionId,
+            message_id: messageId,
+            user_id: user?.id || null,
+            prompt,
+            response,
+            timestamp: new Date().toISOString(),
+          },
+        ]);
 
       if (error) throw error;
+      
+      window.dispatchEvent(new CustomEvent('chat-updated'));
+      
+      return messageId;
     } catch (error) {
       console.error('Error saving conversation:', error);
       throw error;
     }
   }
 
-  async loadChatSession(sessionId: string): Promise<Message[]> {
+  async loadChatSession(sessionId: string): Promise<ChatMessage[]> {
     try {
       const user = await this.getCurrentUser();
       
-      const query = supabase
+      let query = this.supabase
         .from('conversations')
         .select('*')
         .eq('session_id', sessionId)
         .eq('is_deleted', false)
         .order('timestamp', { ascending: true });
 
-      if (user?.id) {
-        query.eq('user_id', user.id);
+      if (user) {
+        query = query.eq('user_id', user.id);
       } else {
-        query.is('user_id', null);
+        query = query.is('user_id', null);
       }
 
       const { data, error } = await query;
 
       if (error) throw error;
-      if (!data) return [];
 
-      return data.flatMap(item => ([
-        { role: 'user', content: item.prompt },
-        { role: 'assistant', content: item.response }
-      ]));
+      return data.map((msg: DatabaseMessage): ChatMessage[] => ([
+        { role: 'user' as const, content: msg.prompt },
+        { role: 'assistant' as const, content: msg.response }
+      ])).flat();
     } catch (error) {
       console.error('Error loading chat session:', error);
       throw error;
     }
   }
 
-  async getChatSessions(limit: number = 10): Promise<ChatSession[]> {
+  async getChatSessions(limit: number = 7): Promise<ChatSession[]> {
     try {
       const user = await this.getCurrentUser();
       
-      const query = supabase
+      let query = this.supabase
         .from('conversations')
         .select('*')
         .eq('is_deleted', false)
         .order('timestamp', { ascending: false });
 
-      if (user?.id) {
-        query.eq('user_id', user.id);
+      if (user) {
+        query = query.eq('user_id', user.id);
       } else {
-        query.is('user_id', null);
+        query = query.is('user_id', null);
       }
 
-      const { data, error } = await query;
+      const { data: sessions, error } = await query;
 
       if (error) throw error;
 
-      const sessionMap = new Map<string, ChatSession>();
-      
-      data?.forEach(msg => {
+      const sessionMap = new Map<string, {
+        session_id: string;
+        last_message: string;
+        timestamp: string;
+        message_count: number;
+      }>();
+
+      sessions?.forEach(msg => {
         if (!sessionMap.has(msg.session_id)) {
           sessionMap.set(msg.session_id, {
             session_id: msg.session_id,
@@ -128,62 +134,63 @@ export class ConversationService {
           });
         } else {
           const session = sessionMap.get(msg.session_id)!;
-          session.message_count++;
+          session.message_count += 1;
         }
       });
 
-      return Array.from(sessionMap.values()).slice(0, limit);
+      const formattedSessions = Array.from(sessionMap.values())
+        .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
+        .slice(0, limit);
+
+      return formattedSessions;
     } catch (error) {
       console.error('Error getting chat sessions:', error);
-      throw error;
+      return [];
     }
   }
 
-  async clearConversationHistory(): Promise<void> {
+  async clearConversationHistory() {
     try {
       const user = await this.getCurrentUser();
       
-      const query = supabase
+      let query = this.supabase
         .from('conversations')
-        .update({ is_deleted: true })
-        .eq('session_id', this.sessionId);
+        .update({ is_deleted: true });
 
-      if (user?.id) {
-        query.eq('user_id', user.id);
+      if (user) {
+        query = query.eq('user_id', user.id);
       } else {
-        query.is('user_id', null);
+        query = query.is('user_id', null);
       }
 
       const { error } = await query;
       if (error) throw error;
+      
+      window.dispatchEvent(new CustomEvent('chat-updated'));
     } catch (error) {
       console.error('Error clearing conversation history:', error);
       throw error;
     }
   }
 
-  async deleteChatSession(sessionId: string): Promise<void> {
+  async deleteChatSession(sessionId: string) {
     try {
       const user = await this.getCurrentUser();
       
-      const query = supabase
+      let query = this.supabase
         .from('conversations')
-        .delete()
+        .update({ is_deleted: true })
         .eq('session_id', sessionId);
 
-      if (user?.id) {
-        query.eq('user_id', user.id);
+      if (user) {
+        query = query.eq('user_id', user.id);
       } else {
-        query.is('user_id', null);
+        query = query.is('user_id', null);
       }
 
       const { error } = await query;
       if (error) throw error;
-
-      if (sessionId === this.sessionId) {
-        this.sessionId = uuidv4();
-      }
-
+      
       window.dispatchEvent(new CustomEvent('chat-updated'));
     } catch (error) {
       console.error('Error deleting chat session:', error);
@@ -191,40 +198,38 @@ export class ConversationService {
     }
   }
 
-  async getRecentConversations(limit: number = 5): Promise<Message[]> {
+  getSessionId(): string {
+    return this.sessionId;
+  }
+
+  async getRecentConversations(limit: number = 5): Promise<ChatMessage[]> {
     try {
       const user = await this.getCurrentUser();
       
-      const query = supabase
+      let query = this.supabase
         .from('conversations')
         .select('*')
-        .eq('session_id', this.sessionId)
         .eq('is_deleted', false)
         .order('timestamp', { ascending: false })
         .limit(limit);
 
-      if (user?.id) {
-        query.eq('user_id', user.id);
+      if (user) {
+        query = query.eq('user_id', user.id);
       } else {
-        query.is('user_id', null);
+        query = query.is('user_id', null);
       }
 
       const { data, error } = await query;
 
       if (error) throw error;
-      if (!data) return [];
 
-      return data.flatMap(item => ([
-        { role: 'user', content: item.prompt },
-        { role: 'assistant', content: item.response }
-      ]));
+      return data.map((msg: DatabaseMessage): ChatMessage[] => ([
+        { role: 'user' as const, content: msg.prompt },
+        { role: 'assistant' as const, content: msg.response }
+      ])).flat();
     } catch (error) {
       console.error('Error getting recent conversations:', error);
-      throw error;
+      return [];
     }
-  }
-
-  getSessionId(): string {
-    return this.sessionId;
   }
 }

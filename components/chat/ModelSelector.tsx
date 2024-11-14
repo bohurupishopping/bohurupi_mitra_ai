@@ -69,27 +69,19 @@ const MODEL_CONFIGS = [
   },
   { 
     provider: 'OpenRouter',
-    value: 'openai/gpt-4o-mini',
-    label: 'GPT-4o Mini',
+    value: 'nousresearch/hermes-3-llama-3.1-405b:free',
+    label: 'Hermes 3 405B',
+    icon: Brain,
+    color: 'text-orange-500',
+    bgColor: 'bg-orange-50',
+  },
+  { 
+    provider: 'OpenRouter',
+    value: 'meta-llama/llama-3.1-70b-instruct:free',
+    label: 'Llama 3.1 70B',
     icon: Sparkles,
-    color: 'text-green-500',
-    bgColor: 'bg-green-50',
-  },
-  { 
-    provider: 'OpenRouter',
-    value: 'google/gemma-2-9b-it:free',
-    label: 'Gemma 2 9B',
-    icon: Cloud,
-    color: 'text-purple-500',
-    bgColor: 'bg-purple-50',
-  },
-  { 
-    provider: 'OpenRouter',
-    value: 'anthropic/claude-3.5-sonnet:beta',
-    label: 'Claude 3.5',
-    icon: FlaskConical,
-    color: 'text-indigo-500',
-    bgColor: 'bg-indigo-50',
+    color: 'text-blue-500',
+    bgColor: 'bg-blue-50',
   }
 ];
 

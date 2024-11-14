@@ -16,6 +16,9 @@ export const useAIGeneration = (props?: UseAIGenerationProps) => {
   const { toast } = useToast();
   const [selectedModel, setSelectedModel] = useState(defaultModel);
   const [generatedContent, setGeneratedContent] = useState('');
+  const [isExpanded, setIsExpanded] = useState(false);
+  const [streamedContent, setStreamedContent] = useState('');
+  const [paragraphs, setParagraphs] = useState<string[]>([]);
 
   const getModelDisplayName = (modelId: string) => {
     const modelMap: { [key: string]: string } = {
@@ -25,9 +28,8 @@ export const useAIGeneration = (props?: UseAIGenerationProps) => {
       'open-mistral-nemo': 'Open Mistral Nemo',
       'mistral-large': 'Mistral Large',
       'xai': 'Grok',
-      'openai/gpt-4o-mini': 'GPT-4o Mini',
-      'google/gemma-2-9b-it:free': 'Gemma 2 9B',
-      'anthropic/claude-3.5-sonnet:beta': 'Claude 3.5'
+      'nousresearch/hermes-3-llama-3.1-405b:free': 'Hermes 3 405B',
+      'meta-llama/llama-3.1-70b-instruct:free': 'Llama 3.1 70B'
     };
     return modelMap[modelId] || modelId;
   };
@@ -72,23 +74,94 @@ Please provide an appropriate response.` : newPrompt;
     }
   };
 
+  const processStreamedText = (text: string) => {
+    // Split text into paragraphs
+    const parts = text.split(/\n\n+/);
+    return parts.filter(p => p.trim().length > 0);
+  };
+
   const generateContent = useCallback(async (prompt: string) => {
     try {
+      const contextualPrompt = await buildContextualPrompt(prompt);
+      const modelToUse = selectedModel;
+      
+      // Handle streaming for Hermes model
+      if (modelToUse === 'nousresearch/hermes-3-llama-3.1-405b:free') {
+        const response = await fetch('/api/generate', {
+          method: 'POST',
+          headers: { 
+            'Content-Type': 'application/json',
+            'Accept': 'text/event-stream',
+          },
+          body: JSON.stringify({
+            model: modelToUse,
+            prompt: contextualPrompt,
+            options: {
+              maxTokens: 4096,
+              temperature: 0.7,
+              topP: 0.4
+            }
+          })
+        });
+
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.error || 'Stream generation failed');
+        }
+        
+        if (!response.body) throw new Error('No response body available');
+        
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
+        
+        let accumulatedText = '';
+        
+        try {
+          while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            
+            const chunk = decoder.decode(value);
+            const lines = chunk.split('\n');
+            
+            for (const line of lines) {
+              if (line.startsWith('data: ')) {
+                try {
+                  const data = JSON.parse(line.slice(6));
+                  accumulatedText = data.accumulated;
+                  const newParagraphs = processStreamedText(accumulatedText);
+                  setParagraphs(newParagraphs);
+                  setStreamedContent(accumulatedText);
+                  
+                  if (data.done) {
+                    await conversationService.saveConversation(prompt, accumulatedText);
+                    setGeneratedContent(accumulatedText);
+                    return accumulatedText;
+                  }
+                } catch (e) {
+                  console.error('Error parsing streaming data:', e);
+                }
+              }
+            }
+          }
+        } catch (error) {
+          console.error('Streaming error:', error);
+          throw error;
+        } finally {
+          reader.releaseLock();
+        }
+      }
+      
       // Check if the prompt is asking about model identity
       const isModelQuery = prompt.toLowerCase().includes('which model') || 
                           prompt.toLowerCase().includes('what model') ||
                           prompt.toLowerCase().includes('who are you');
 
-      const contextualPrompt = await buildContextualPrompt(prompt);
-      
       const options = {
         maxTokens: 4096,
         temperature: 0.7,
         topP: 0.4
       };
-
-      // Store the current model to ensure consistency
-      const currentModel = selectedModel;
 
       const response = await fetch('/api/generate', {
         method: 'POST',
@@ -96,7 +169,7 @@ Please provide an appropriate response.` : newPrompt;
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          model: currentModel,
+          model: modelToUse,
           prompt: contextualPrompt,
           options,
           isModelQuery
@@ -114,7 +187,7 @@ Please provide an appropriate response.` : newPrompt;
 
         // Add model identity if needed
         if (isModelQuery) {
-          const modelName = getModelDisplayName(currentModel);
+          const modelName = getModelDisplayName(modelToUse);
           finalResponse = `I am ${modelName}, an AI language model. ${finalResponse}`;
         }
 
@@ -134,7 +207,7 @@ Please provide an appropriate response.` : newPrompt;
       });
       return null;
     }
-  }, [selectedModel, toast]);
+  }, [selectedModel, toast, conversationService]);
 
   // Persist model selection in localStorage
   const handleModelChange = (model: string) => {
@@ -162,6 +235,10 @@ Please provide an appropriate response.` : newPrompt;
     selectedModel,
     setSelectedModel: handleModelChange,
     generatedContent,
-    generateContent
+    generateContent,
+    streamedContent,
+    paragraphs,
+    isExpanded,
+    setIsExpanded
   };
 }; 

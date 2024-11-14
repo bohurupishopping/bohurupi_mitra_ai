@@ -9,7 +9,7 @@ import { GoogleGenerativeAI } from "@google/generative-ai";
 // Initialize clients with server-side env variables
 const openRouterClient = new OpenAI({
   baseURL: "https://openrouter.ai/api/v1",
-  apiKey: process.env.OPENAI_API_KEY || 'dummy-key',
+  apiKey: process.env.OPEN_ROUTER_API_KEY || '',
   defaultHeaders: {
     "HTTP-Referer": process.env.NEXT_PUBLIC_APP_URL,
     "X-Title": "Creative Scribe",
@@ -42,6 +42,62 @@ export async function POST(req: Request) {
   try {
     const { model, prompt, options } = await req.json();
 
+    // Handle Hermes model streaming first
+    if (model === 'nousresearch/hermes-3-llama-3.1-405b:free') {
+      const stream = await openRouterClient.chat.completions.create({
+        model: model,
+        messages: [{ role: 'user', content: prompt }],
+        max_tokens: options?.maxTokens || 4096,
+        temperature: options?.temperature || 0.7,
+        top_p: options?.topP || 0.4,
+        stream: true
+      });
+
+      const textEncoder = new TextEncoder();
+      const readable = new ReadableStream({
+        async start(controller) {
+          let accumulatedText = '';
+          
+          try {
+            for await (const chunk of stream) {
+              const content = chunk.choices[0]?.delta?.content || '';
+              accumulatedText += content;
+              
+              // Send the chunk with paragraph information
+              const data = {
+                text: content,
+                accumulated: accumulatedText,
+                done: false
+              };
+              
+              controller.enqueue(textEncoder.encode(`data: ${JSON.stringify(data)}\n\n`));
+            }
+            
+            // Send final accumulated text
+            controller.enqueue(
+              textEncoder.encode(
+                `data: ${JSON.stringify({ text: '', accumulated: accumulatedText, done: true })}\n\n`
+              )
+            );
+          } catch (error) {
+            console.error('Streaming error:', error);
+            controller.error(error);
+          } finally {
+            controller.close();
+          }
+        },
+      });
+
+      return new Response(readable, {
+        headers: {
+          'Content-Type': 'text/event-stream',
+          'Cache-Control': 'no-cache',
+          'Connection': 'keep-alive',
+        },
+      });
+    }
+
+    // Handle other models as before...
     let result;
 
     // Handle Google AI models with streaming for Gemini 1.5 Pro
@@ -86,7 +142,8 @@ export async function POST(req: Request) {
         messages: [{ role: 'user', content: prompt }],
         max_tokens: options?.maxTokens || 4096,
         temperature: options?.temperature || 0.7,
-        top_p: options?.topP || 0.4
+        top_p: options?.topP || 0.4,
+        stream: false
       });
 
       result = response.choices[0]?.message?.content;
@@ -102,7 +159,7 @@ export async function POST(req: Request) {
           modelInstance = mistralClient('mistral-large-2407');
           break;
         case 'groq':
-          modelInstance = groqClient('llama-3.2-90b-text-preview');
+          modelInstance = groqClient('llama-3.2-90b-vision-preview');
           break;
         case 'xai':
           modelInstance = xai('grok-beta');

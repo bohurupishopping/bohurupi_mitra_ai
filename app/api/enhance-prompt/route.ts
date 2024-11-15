@@ -2,8 +2,8 @@ import { NextResponse } from 'next/server';
 import OpenAI from 'openai';
 
 const client = new OpenAI({
-  apiKey: process.env.MISTRAL_API_KEY,
-  baseURL: 'https://api.mistral.ai/v1',
+  apiKey: process.env.XAI_API_KEY,
+  baseURL: 'https://api.x.ai/v1',
 });
 
 const systemPrompt = `You are an expert at writing prompts for AI image generation.
@@ -29,7 +29,7 @@ export async function POST(request: Request) {
     }
 
     const completion = await client.chat.completions.create({
-      model: 'ministral-3b-latest',
+      model: 'grok-beta',
       messages: [
         {
           role: 'system',

@@ -29,6 +29,9 @@ function ImagineContent() {
   const imageHistoryServiceRef = useRef(ImageHistoryService.getInstance());
   const [historyImages, setHistoryImages] = useState<ImageSession[]>([]);
   const [selectedImagePrompt, setSelectedImagePrompt] = useState<string>('');
+  const [visibleImages, setVisibleImages] = useState(6);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
+  const [isPreloading, setIsPreloading] = useState(false);
 
   // Add virtual scrolling ref
   const { ref: gridRef, inView } = useInView({
@@ -68,21 +71,52 @@ function ImagineContent() {
   }, []);
 
   const imageVariants = {
-    hidden: { opacity: 0, scale: 0.8 },
+    hidden: { 
+      opacity: 0,
+      y: 20,
+      scale: 0.95
+    },
     visible: { 
-      opacity: 1, 
+      opacity: 1,
+      y: 0,
       scale: 1,
       transition: { 
         type: "spring",
-        stiffness: 260,
-        damping: 20,
-        duration: 0.5 
+        stiffness: 400,
+        damping: 30,
+        mass: 0.5,
+        duration: 0.3
       }
     },
     exit: { 
-      opacity: 0, 
-      scale: 0.8,
-      transition: { duration: 0.2 }
+      opacity: 0,
+      scale: 0.95,
+      transition: { 
+        duration: 0.2,
+        ease: "easeOut"
+      }
+    }
+  };
+
+  const loadingVariants = {
+    initial: { 
+      opacity: 0,
+      scale: 0.9
+    },
+    animate: { 
+      opacity: 1,
+      scale: 1,
+      transition: {
+        duration: 0.3,
+        ease: "easeOut"
+      }
+    },
+    exit: { 
+      opacity: 0,
+      scale: 0.9,
+      transition: {
+        duration: 0.2
+      }
     }
   };
 
@@ -148,9 +182,13 @@ function ImagineContent() {
     if (!prompt.trim() || isLoading) return;
 
     setIsLoading(true);
-    smoothScrollToTop(); // Scroll to top when starting generation
+    setIsPreloading(true);
+    
+    // Start smooth scroll
+    smoothScrollToTop();
 
     try {
+      // Make API request immediately without delay
       const response = await fetch('/api/imagine', {
         method: 'POST',
         headers: {
@@ -171,10 +209,24 @@ function ImagineContent() {
 
       if (data.success && data.data[0]?.url) {
         const imageUrl = data.data[0].url;
-        setGeneratedImage(imageUrl);
         
-        await imageHistoryServiceRef.current.saveImage(prompt, imageUrl);
+        // Preload image and update state simultaneously
+        await Promise.all([
+          new Promise<void>((resolve, reject) => {
+            const img = document.createElement('img');
+            img.onload = () => resolve();
+            img.onerror = () => reject(new Error('Failed to load image'));
+            img.src = imageUrl;
+          }),
+          imageHistoryServiceRef.current.saveImage(prompt, imageUrl)
+        ]);
+
+        // Update states after both image preload and save are complete
+        setGeneratedImage(imageUrl);
         await loadImageHistory();
+        
+        // Ensure minimum 6 visible images
+        setVisibleImages(prev => Math.max(prev, 6));
         
         toast({
           title: "Success",
@@ -192,6 +244,7 @@ function ImagineContent() {
       });
     } finally {
       setIsLoading(false);
+      setIsPreloading(false);
     }
   };
 
@@ -228,6 +281,18 @@ function ImagineContent() {
       });
     }
   };
+
+  const loadMoreImages = useCallback(() => {
+    setIsLoadingMore(true);
+    
+    // Use requestAnimationFrame for smoother transitions
+    requestAnimationFrame(() => {
+      setVisibleImages(prev => prev + 6);
+      setTimeout(() => {
+        setIsLoadingMore(false);
+      }, 300);
+    });
+  }, []);
 
   return (
     <div className="flex h-[100dvh] overflow-hidden bg-gradient-to-br from-purple-100 via-blue-100 to-pink-100">
@@ -285,23 +350,38 @@ function ImagineContent() {
                 >
                   {isLoading && (
                     <m.div
-                      variants={imageVariants}
+                      variants={loadingVariants}
+                      initial="initial"
+                      animate="animate"
+                      exit="exit"
                       className="relative aspect-square rounded-2xl overflow-hidden
                         shadow-lg bg-white/50 backdrop-blur-sm border border-white/20
-                        flex items-center justify-center"
+                        flex items-center justify-center col-span-1 row-start-1"
                     >
-                      <div className="absolute inset-0 bg-gradient-to-r from-blue-500/20 to-purple-500/20 animate-pulse" />
+                      <div className="absolute inset-0">
+                        <motion.div
+                          className="absolute inset-0 bg-gradient-to-r from-blue-500/20 via-purple-500/20 to-pink-500/20"
+                          animate={{
+                            x: ['0%', '100%', '0%'],
+                          }}
+                          transition={{
+                            duration: 1.5,
+                            repeat: Infinity,
+                            ease: "linear"
+                          }}
+                        />
+                      </div>
                       <motion.div
                         animate={{ rotate: 360 }}
-                        transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
+                        transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
                       >
-                        <RefreshCw className="w-8 h-8 text-gray-400" />
+                        <RefreshCw className="w-6 h-6 text-gray-400" />
                       </motion.div>
                     </m.div>
                   )}
                   
                   <AnimatePresence mode="popLayout">
-                    {historyImages.map((imageSession, index) => (
+                    {historyImages.slice(0, visibleImages).map((imageSession, index) => (
                       <m.div
                         key={`history-${imageSession.id}`}
                         variants={imageVariants}
@@ -314,7 +394,9 @@ function ImagineContent() {
                           cursor-pointer group transform-gpu will-change-transform"
                         style={{
                           perspective: "1000px",
-                          backfaceVisibility: "hidden"
+                          backfaceVisibility: "hidden",
+                          // Add staggered animation delay based on index
+                          transitionDelay: `${index * 50}ms`
                         }}
                         onClick={() => {
                           setSelectedImage(imageSession.image_url);
@@ -325,12 +407,12 @@ function ImagineContent() {
                           src={imageSession.image_url}
                           alt={`History image ${index + 1}`}
                           fill
-                          priority={index < 4}
+                          priority={index < 6}
                           className="object-cover transition-all duration-500
                             group-hover:scale-[1.02] will-change-transform"
                           sizes="(max-width: 768px) 50vw, (max-width: 1200px) 33vw, 25vw"
-                          loading={index < 8 ? "eager" : "lazy"}
-                          quality={index < 8 ? 90 : 75}
+                          loading={index < 12 ? "eager" : "lazy"}
+                          quality={index < 12 ? 90 : 75}
                         />
                         <div className="absolute inset-0 bg-gradient-to-b from-transparent 
                           via-transparent to-black/20 opacity-0 group-hover:opacity-100 
@@ -356,6 +438,27 @@ function ImagineContent() {
                       </m.div>
                     ))}
                   </AnimatePresence>
+                  {historyImages.length > visibleImages && (
+                    <m.div
+                      initial={{ opacity: 0, y: 20 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ duration: 0.3 }}
+                      className="col-span-full flex justify-center my-4"
+                    >
+                      <Button
+                        variant="outline"
+                        onClick={loadMoreImages}
+                        disabled={isLoadingMore}
+                        className="bg-white/50 backdrop-blur-sm hover:bg-white/60 
+                          transition-all duration-300 rounded-xl"
+                      >
+                        {isLoadingMore ? (
+                          <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+                        ) : null}
+                        Load More Images
+                      </Button>
+                    </m.div>
+                  )}
                 </m.div>
               </LazyMotion>
             </div>

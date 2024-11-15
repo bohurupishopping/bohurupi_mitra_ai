@@ -15,6 +15,9 @@ Follow these guidelines:
 - Keep the core subject/idea from the original prompt
 - Make the prompt detailed but concise (max 200 words)
 - Focus on photorealistic quality
+- IMPORTANT: Respond ONLY with the enhanced prompt text
+- Do NOT include any explanatory text, prefixes, or suffixes
+- Do NOT include phrases like "Enhanced prompt:" or "This prompt provides..."
 Do not include negative prompts or technical parameters - only enhance the descriptive content.`;
 
 export async function POST(request: Request) {
@@ -34,15 +37,25 @@ export async function POST(request: Request) {
         },
         {
           role: 'user',
-          content: `Original prompt: "${prompt}"
-            
-Please enhance this prompt to create a photorealistic image. Focus on visual details, lighting, and atmosphere.`
+          content: prompt // Send just the prompt without additional text
         }
       ],
       temperature: 0.7,
     });
 
-    const enhancedPrompt = completion.choices[0].message.content?.trim();
+    // Clean up the response by removing any common prefixes or suffixes
+    let enhancedPrompt = completion.choices[0].message.content?.trim() || '';
+    
+    // Remove common prefixes that might appear
+    enhancedPrompt = enhancedPrompt
+      .replace(/^(Enhanced prompt:|Enhance the prompt:|This prompt:|Here's the enhanced prompt:)/i, '')
+      .replace(/^["']|["']$/g, '') // Remove quotes at start/end if present
+      .trim();
+    
+    // Remove common suffixes that might appear
+    enhancedPrompt = enhancedPrompt
+      .replace(/\b(This enhanced prompt provides|This description provides).*$/i, '')
+      .trim();
 
     return NextResponse.json({
       success: true,

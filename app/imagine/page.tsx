@@ -40,12 +40,10 @@ function ImagineContent() {
   const scrollContainerRef = useRef<HTMLDivElement>(null);
 
   // Smooth scroll function
-  const smoothScrollToBottom = useCallback(() => {
+  const smoothScrollToTop = useCallback(() => {
     if (scrollContainerRef.current) {
       const scrollContainer = scrollContainerRef.current;
-      const targetPosition = scrollContainer.scrollHeight;
       const startPosition = scrollContainer.scrollTop;
-      const distance = targetPosition - startPosition;
       const duration = 500; // ms
       let start: number | null = null;
 
@@ -57,7 +55,7 @@ function ImagineContent() {
         // Easing function for smooth deceleration
         const easeOutCubic = (x: number) => 1 - Math.pow(1 - x, 3);
         
-        const position = startPosition + distance * easeOutCubic(progress);
+        const position = startPosition * (1 - easeOutCubic(progress));
         scrollContainer.scrollTop = position;
 
         if (timeElapsed < duration) {
@@ -150,7 +148,7 @@ function ImagineContent() {
     if (!prompt.trim() || isLoading) return;
 
     setIsLoading(true);
-    smoothScrollToBottom(); // Scroll to show loading state
+    smoothScrollToTop(); // Scroll to top when starting generation
 
     try {
       const response = await fetch('/api/imagine', {
@@ -185,8 +183,6 @@ function ImagineContent() {
       } else {
         throw new Error('No image URL received');
       }
-
-      setTimeout(smoothScrollToBottom, 100); // Scroll to show new image
     } catch (error: any) {
       console.error('Error:', error);
       toast({

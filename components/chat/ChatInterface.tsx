@@ -83,7 +83,85 @@ const stripHtmlAndFormatText = (html: string): string => {
   return text;
 };
 
-export default function ChatInterface({ defaultMessage, sessionId, onModelChange }: ChatInterfaceProps) {
+// Update the message container and text styling
+const messageContainerStyles = `flex-1 overflow-y-auto scrollbar-thin scrollbar-thumb-black/10 
+  scrollbar-track-transparent hover:scrollbar-thumb-black/20 
+  transition-colors duration-200 scroll-smooth
+  overscroll-y-contain momentum-scroll
+  [-webkit-overflow-scrolling:touch]
+  [scroll-behavior:smooth]
+  will-change-scroll
+  px-2 sm:px-4 py-2 sm:py-4 
+  space-y-2 sm:space-y-3 
+  relative z-10`;
+
+const messageStyles = {
+  user: `bg-gradient-to-r from-blue-600 to-blue-500 
+    text-[0.925rem] sm:text-base leading-relaxed
+    shadow-lg hover:shadow-xl transition-shadow duration-200
+    text-white/95`,
+  assistant: `bg-white/50 backdrop-blur-[10px] 
+    text-[0.925rem] sm:text-base leading-relaxed
+    border border-white/20 text-gray-800
+    shadow-sm hover:shadow-md transition-shadow duration-200`
+};
+
+// Update the typing effect utilities
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+const typeText = async (
+  text: string, 
+  callback: (partial: string) => void, 
+  speed: number = 2  // Even faster base speed
+) => {
+  let partial = '';
+  // Optimized tokenization for faster processing
+  const tokens = text.split(/(\s+|\n|#{1,3}\s|`{1,3}|\*{1,2}|>|-)/).filter(Boolean);
+  let buffer = '';
+  let lastUpdate = Date.now();
+  const updateThreshold = 8; // ~120fps for smoother updates
+
+  // Process tokens in chunks for better performance
+  const chunkSize = 3; // Process multiple tokens per iteration
+  for (let i = 0; i < tokens.length; i += chunkSize) {
+    const chunk = tokens.slice(i, i + chunkSize);
+    
+    for (const token of chunk) {
+      partial += token;
+      buffer += token;
+    }
+    
+    const now = Date.now();
+    // More frequent updates for smoother appearance
+    if (now - lastUpdate >= updateThreshold) {
+      callback(partial);
+      buffer = '';
+      lastUpdate = now;
+    }
+
+    // Faster dynamic speed adjustments
+    const delay = 
+      chunk.some(token => token.match(/^#{1,3}\s/)) ? 100 : // Headers
+      chunk.some(token => token.match(/^```/)) ? 80 : // Code blocks
+      chunk.some(token => token.match(/^`[^`]/)) ? 50 : // Inline code
+      chunk.some(token => token.match(/^\*{1,2}[^*]/)) ? 40 : // Emphasis
+      chunk.some(token => token.match(/^>/)) ? 60 : // Blockquotes
+      chunk.some(token => token.match(/^-/)) ? 50 : // List items
+      chunk.some(token => token.includes('\n')) ? 50 : // Line breaks
+      chunk.some(token => token.match(/[.,!?]$/)) ? 40 : // Punctuation
+      chunk.some(token => token.match(/[;:]$/)) ? 30 : // Semicolons/colons
+      Math.max(5, chunk.join('').length * speed); // Base typing speed
+
+    await sleep(delay);
+  }
+
+  // Final update to ensure all content is displayed
+  if (buffer) {
+    callback(partial);
+  }
+};
+
+function ChatInterface({ defaultMessage, sessionId, onModelChange }: ChatInterfaceProps) {
   const [conversationService] = useState(() => new ConversationService(sessionId));
   const { selectedModel, setSelectedModel, generateContent } = useAIGeneration({ 
     conversationService,
@@ -231,6 +309,7 @@ export default function ChatInterface({ defaultMessage, sessionId, onModelChange
     }
   };
 
+  // Update the handleSubmit function with optimized animation handling
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if ((!prompt.trim() && attachments.length === 0) || isLoading) return;
@@ -249,14 +328,44 @@ export default function ChatInterface({ defaultMessage, sessionId, onModelChange
       const response = await generateContent(prompt);
       
       if (response) {
-        const assistantMessage: Message = {
+        const tempMessage: Message = {
           role: 'assistant',
-          content: response
+          content: ''
+        };
+        
+        setMessages(prev => [...prev, tempMessage]);
+        
+        // Optimized animation frame handling
+        let lastFrameTime = performance.now();
+        let animationFrameId: number | undefined;
+
+        const updateMessage = (partial: string) => {
+          if (animationFrameId) {
+            cancelAnimationFrame(animationFrameId);
+          }
+
+          animationFrameId = requestAnimationFrame(() => {
+            const currentTime = performance.now();
+            if (currentTime - lastFrameTime >= 8) { // ~120fps
+              setMessages(prev => [
+                ...prev.slice(0, -1),
+                {
+                  role: 'assistant',
+                  content: partial
+                }
+              ]);
+              lastFrameTime = currentTime;
+            }
+          });
         };
 
-        setMessages(prev => [...prev, assistantMessage]);
-        
-        // Save conversation to database
+        await typeText(response, updateMessage);
+
+        // Cleanup
+        if (animationFrameId) {
+          cancelAnimationFrame(animationFrameId);
+        }
+
         await conversationService.saveConversation(prompt, response);
         window.dispatchEvent(new CustomEvent('chat-updated'));
       }
@@ -276,19 +385,17 @@ export default function ChatInterface({ defaultMessage, sessionId, onModelChange
 
   return (
     <div className="h-[100dvh] flex flex-col overflow-hidden 
-      px-3 sm:px-4 md:px-6 lg:px-8 py-0 sm:p-1 
-      w-full max-w-[1600px] mx-auto
-      bg-gradient-to-br from-purple-100 via-blue-100 to-pink-100">
-      <Card 
-        className="flex-1 mx-0.5 my-0.5 sm:m-2 
-          bg-white/60 backdrop-blur-[10px] 
-          rounded-lg sm:rounded-[2rem] 
-          border border-white/20 
-          shadow-[0_8px_40px_rgba(0,0,0,0.12)] 
-          relative flex flex-col overflow-hidden
-          w-full max-w-[1400px] mx-auto
-          h-[calc(100dvh-20px)] sm:h-[calc(98dvh-16px)]"
-      >
+      px-2 sm:px-4 md:px-6 lg:px-8 py-0 sm:p-1 
+      w-full max-w-[1600px] mx-auto">
+      <Card className="flex-1 mx-0.5 my-0.5 sm:m-2 
+        bg-white/60 backdrop-blur-[12px] 
+        rounded-2xl sm:rounded-[2rem] 
+        border border-white/20 
+        shadow-[0_8px_40px_rgba(0,0,0,0.08)] 
+        relative flex flex-col overflow-hidden
+        w-full max-w-[1400px] mx-auto
+        h-[calc(100dvh-20px)] sm:h-[calc(98dvh-16px)]">
+        
         <div className="absolute inset-0 rounded-[2rem] sm:rounded-[2.5rem] animate-glow">
           <div className="absolute inset-0 rounded-[2rem] sm:rounded-[2.5rem] 
             bg-gradient-to-r from-blue-500/20 via-purple-500/20 to-pink-500/20 
@@ -386,10 +493,9 @@ export default function ChatInterface({ defaultMessage, sessionId, onModelChange
           </div>
         </CardHeader>
 
-        <CardContent 
-          className="flex-1 flex flex-col overflow-hidden p-0 
-            h-[calc(100dvh-60px)] sm:h-[calc(94dvh-100px)]"
-        >
+        <CardContent className="flex-1 flex flex-col overflow-hidden p-0 
+          h-[calc(100dvh-60px)] sm:h-[calc(94dvh-100px)]">
+          
           {isSearching && (
             <div className="p-2 sm:p-3 border-b border-white/20 bg-white/40 backdrop-blur-[10px] flex-shrink-0">
               <div className="relative">
@@ -412,142 +518,140 @@ export default function ChatInterface({ defaultMessage, sessionId, onModelChange
             </div>
           )}
           
-          <div 
-            className="flex-1 overflow-y-auto scrollbar-thin scrollbar-thumb-blue-500/20 
-              scrollbar-track-transparent hover:scrollbar-thumb-blue-500/30 
-              transition-colors duration-200 scroll-smooth
-              overscroll-y-contain momentum-scroll
-              [-webkit-overflow-scrolling:touch]
-              [scroll-behavior:smooth]
-              will-change-scroll"
-          >
-            <div className="p-2 sm:p-4 space-y-2 sm:space-y-3 relative z-10 
-              [transform:translateZ(0)]">
-              <AnimatePresence mode="popLayout">
-                {(searchQuery ? filteredMessages : messages).map((message, index) => (
-                  <motion.div
-                    key={index}
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: -20 }}
-                    transition={{ 
-                      type: "spring",
-                      stiffness: 500,
-                      damping: 30,
-                      mass: 1
-                    }}
-                    className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
-                  >
-                    <div className={`flex items-start space-x-1 sm:space-x-2 
-                      max-w-[92%] sm:max-w-[80%] 
-                      ${message.role === 'user' ? 'flex-row-reverse space-x-reverse' : ''}`}>
-                      <Avatar className="w-5 h-5 sm:w-8 sm:h-8 mt-0.5">
-                        <AvatarImage 
-                          src={message.role === 'user' ? "/assets/pritam-img.png" : "/assets/ai-icon.png"} 
-                          alt={message.role === 'user' ? "User" : "AI"} 
-                        />
-                      </Avatar>
-                      <div className="flex flex-col space-y-0.5 min-w-0">
-                        <motion.div
-                          initial={{ scale: 0.95 }}
-                          animate={{ scale: 1 }}
-                          className={`px-2 sm:px-4 py-2 sm:py-3 rounded-xl sm:rounded-2xl 
-                            break-words overflow-hidden
-                            ${message.role === 'user' 
-                              ? 'bg-gradient-to-r from-blue-600 to-blue-500 text-white shadow-lg' 
-                              : 'bg-white/50 backdrop-blur-[10px] border border-white/20 text-gray-900'
-                            }`}
-                        >
-                          <div className={`whitespace-pre-wrap break-words text-xs sm:text-sm 
-                            ${message.role === 'user' ? 'text-white/90' : ''}`}>
-                            {message.role === 'user' ? (
-                              <div className="text-white leading-relaxed overflow-x-auto">
-                                {message.content}
-                              </div>
-                            ) : (
-                              <div className="space-y-1 overflow-x-auto">
-                                <ReactMarkdown
-                                  components={{
-                                    pre: ({ node, ...props }) => (
-                                      <div className="overflow-x-auto max-w-full">
-                                        <pre {...props} className="p-2 rounded bg-black/5 text-[0.8rem] sm:text-sm" />
-                                      </div>
-                                    ),
-                                    code: ({ node, ...props }) => (
-                                      <code {...props} className="break-all sm:break-normal text-[0.8rem] sm:text-sm" />
-                                    ),
-                                    p: ({ node, ...props }) => (
-                                      <p {...props} className="break-words" />
-                                    )
-                                  }}
-                                >
-                                  {message.content}
-                                </ReactMarkdown>
-                              </div>
-                            )}
+          <div className={messageContainerStyles}>
+            <AnimatePresence mode="popLayout">
+              {(searchQuery ? filteredMessages : messages).map((message, index) => (
+                <motion.div
+                  key={index}
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -10 }}
+                  transition={{ 
+                    type: "spring",
+                    stiffness: 500,
+                    damping: 30,
+                    mass: 0.8
+                  }}
+                  className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'} 
+                    transform-gpu will-change-transform`}
+                >
+                  <div className={`flex items-start space-x-1.5 sm:space-x-2 
+                    max-w-[88%] sm:max-w-[80%] lg:max-w-[75%]
+                    ${message.role === 'user' ? 'flex-row-reverse space-x-reverse' : ''}`}>
+                    <Avatar className="w-6 h-6 sm:w-8 sm:h-8 mt-0.5 flex-shrink-0">
+                      <AvatarImage 
+                        src={message.role === 'user' ? "/assets/pritam-img.png" : "/assets/ai-icon.png"} 
+                        alt={message.role === 'user' ? "User" : "AI"}
+                        className="object-cover"
+                      />
+                    </Avatar>
+                    
+                    <motion.div
+                      initial={{ scale: 0.95 }}
+                      animate={{ scale: 1 }}
+                      className={`px-3 sm:px-4 py-2.5 sm:py-3 rounded-2xl sm:rounded-2xl 
+                        break-words overflow-hidden
+                        ${messageStyles[message.role]}`}
+                    >
+                      <div className="overflow-x-auto">
+                        {message.role === 'user' ? (
+                          <div className="leading-relaxed">
+                            {message.content}
                           </div>
-                          <div className="flex justify-end mt-1.5">
-                            <TooltipProvider>
-                              <Tooltip>
-                                <TooltipTrigger asChild>
-                                  <Button
-                                    variant="ghost"
-                                    size="icon"
-                                    className={`h-5 w-5 rounded-full 
-                                      ${message.role === 'user' 
-                                        ? 'text-white/70 hover:text-white hover:bg-white/10' 
-                                        : 'text-gray-500 hover:text-gray-700 hover:bg-gray-100/50'
-                                      } active:scale-95 transition-all duration-200`}
-                                    onClick={() => copyToClipboard(message.content, index)}
-                                  >
-                                    {copiedIndex === index ? (
-                                      <Check className="h-3 w-3" />
-                                    ) : (
-                                      <Copy className="h-3 w-3" />
-                                    )}
-                                  </Button>
-                                </TooltipTrigger>
-                                <TooltipContent>
-                                  <p>{copiedIndex === index ? 'Copied!' : 'Copy message'}</p>
-                                </TooltipContent>
-                              </Tooltip>
-                            </TooltipProvider>
-                          </div>
-                        </motion.div>
+                        ) : (
+                          <ReactMarkdown
+                            components={{
+                              pre: ({ node, ...props }) => (
+                                <div className="overflow-x-auto max-w-full my-2">
+                                  <pre {...props} className="p-3 rounded-xl bg-black/5 
+                                    text-[0.85rem] sm:text-[0.925rem] leading-relaxed" />
+                                </div>
+                              ),
+                              code: ({ node, ...props }) => (
+                                <code {...props} className="break-words sm:break-normal 
+                                  text-[0.85rem] sm:text-[0.925rem] leading-relaxed" />
+                              ),
+                              p: ({ node, ...props }) => (
+                                <p {...props} className="break-words mb-2 last:mb-0" />
+                              ),
+                              ul: ({ node, ...props }) => (
+                                <ul {...props} className="list-disc pl-4 mb-2 space-y-1" />
+                              ),
+                              ol: ({ node, ...props }) => (
+                                <ol {...props} className="list-decimal pl-4 mb-2 space-y-1" />
+                              ),
+                              li: ({ node, ...props }) => (
+                                <li {...props} className="mb-1 last:mb-0" />
+                              )
+                            }}
+                          >
+                            {message.content}
+                          </ReactMarkdown>
+                        )}
                       </div>
-                    </div>
-                  </motion.div>
-                ))}
-                {isTyping && (
+
+                      <div className="flex justify-end mt-1.5">
+                        <TooltipProvider>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className={`h-5 w-5 rounded-full 
+                                  ${message.role === 'user' 
+                                    ? 'text-white/70 hover:text-white hover:bg-white/10' 
+                                    : 'text-gray-500 hover:text-gray-700 hover:bg-gray-100/50'
+                                  } active:scale-95 transition-all duration-200`}
+                                onClick={() => copyToClipboard(message.content, index)}
+                              >
+                                {copiedIndex === index ? (
+                                  <Check className="h-3 w-3" />
+                                ) : (
+                                  <Copy className="h-3 w-3" />
+                                )}
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                              <p>{copiedIndex === index ? 'Copied!' : 'Copy message'}</p>
+                            </TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
+                      </div>
+                    </motion.div>
+                  </div>
+                </motion.div>
+              ))}
+            </AnimatePresence>
+            
+            {isTyping && (
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -20 }}
+                transition={{ type: "spring", stiffness: 500, damping: 30 }}
+                className="flex justify-start"
+              >
+                <div className="flex items-center space-x-2 px-4 py-3 rounded-xl bg-white/50">
                   <motion.div
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: -20 }}
-                    transition={{ type: "spring", stiffness: 500, damping: 30 }}
-                    className="flex justify-start"
-                  >
-                    <div className="flex items-center space-x-2 px-4 py-3 rounded-xl bg-white/50">
-                      <motion.div
-                        animate={{ scale: [1, 1.2, 1] }}
-                        transition={{ repeat: Infinity, duration: 1, repeatDelay: 0.2 }}
-                        className="w-2 h-2 bg-blue-500 rounded-full"
-                      />
-                      <motion.div
-                        animate={{ scale: [1, 1.2, 1] }}
-                        transition={{ repeat: Infinity, duration: 1, delay: 0.2, repeatDelay: 0.2 }}
-                        className="w-2 h-2 bg-blue-500 rounded-full"
-                      />
-                      <motion.div
-                        animate={{ scale: [1, 1.2, 1] }}
-                        transition={{ repeat: Infinity, duration: 1, delay: 0.4, repeatDelay: 0.2 }}
-                        className="w-2 h-2 bg-blue-500 rounded-full"
-                      />
-                    </div>
-                  </motion.div>
-                )}
-              </AnimatePresence>
-              <div ref={messagesEndRef} className="scroll-mt-[100px]" />
-            </div>
+                    animate={{ scale: [1, 1.2, 1] }}
+                    transition={{ repeat: Infinity, duration: 1, repeatDelay: 0.2 }}
+                    className="w-2 h-2 bg-blue-500 rounded-full"
+                  />
+                  <motion.div
+                    animate={{ scale: [1, 1.2, 1] }}
+                    transition={{ repeat: Infinity, duration: 1, delay: 0.2, repeatDelay: 0.2 }}
+                    className="w-2 h-2 bg-blue-500 rounded-full"
+                  />
+                  <motion.div
+                    animate={{ scale: [1, 1.2, 1] }}
+                    transition={{ repeat: Infinity, duration: 1, delay: 0.4, repeatDelay: 0.2 }}
+                    className="w-2 h-2 bg-blue-500 rounded-full"
+                  />
+                </div>
+              </motion.div>
+            )}
+            
+            <div ref={messagesEndRef} className="scroll-mt-[100px]" />
           </div>
 
           <div className="border-t bg-transparent p-2 sm:p-4">
@@ -703,3 +807,5 @@ export default function ChatInterface({ defaultMessage, sessionId, onModelChange
     </div>
   );
 }
+
+export default React.memo(ChatInterface);

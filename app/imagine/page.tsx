@@ -77,8 +77,8 @@ function ImagineContent() {
   const imageVariants = {
     hidden: { 
       opacity: 0,
-      y: 20,
-      scale: 0.95
+      y: 10,
+      scale: 0.98
     },
     visible: { 
       opacity: 1,
@@ -86,18 +86,28 @@ function ImagineContent() {
       scale: 1,
       transition: { 
         type: "spring",
-        stiffness: 400,
-        damping: 30,
+        stiffness: 500,
+        damping: 25,
         mass: 0.5,
-        duration: 0.3
+        duration: 0.2
       }
     },
     exit: { 
       opacity: 0,
-      scale: 0.95,
+      scale: 0.98,
       transition: { 
-        duration: 0.2,
+        duration: 0.15,
         ease: "easeOut"
+      }
+    },
+    hover: {
+      scale: 1.02,
+      y: -2,
+      transition: {
+        type: "spring",
+        stiffness: 500,
+        damping: 25,
+        mass: 0.5
       }
     }
   };
@@ -105,21 +115,21 @@ function ImagineContent() {
   const loadingVariants = {
     initial: { 
       opacity: 0,
-      scale: 0.9
+      scale: 0.98
     },
     animate: { 
       opacity: 1,
       scale: 1,
       transition: {
-        duration: 0.3,
-        ease: "easeOut"
+        duration: 0.2,
+        ease: [0.23, 1, 0.32, 1]
       }
     },
     exit: { 
       opacity: 0,
-      scale: 0.9,
+      scale: 0.98,
       transition: {
-        duration: 0.2
+        duration: 0.15
       }
     }
   };
@@ -355,6 +365,10 @@ function ImagineContent() {
                   initial="hidden"
                   animate="visible"
                   exit="exit"
+                  transition={{
+                    staggerChildren: 0.05,
+                    delayChildren: 0.1
+                  }}
                 >
                   {isLoading && (
                     <m.div
@@ -366,11 +380,60 @@ function ImagineContent() {
                         shadow-lg bg-white/50 backdrop-blur-sm border border-white/20
                         flex items-center justify-center col-span-1 row-start-1"
                     >
-                      <div className="absolute inset-0">
+                      <div className="absolute inset-0 flex flex-col items-center justify-center p-6">
                         <motion.div
-                          className="absolute inset-0 bg-gradient-to-r from-blue-500/20 via-purple-500/20 to-pink-500/20"
+                          animate={{ rotate: 360 }}
+                          transition={{ 
+                            duration: 2,
+                            repeat: Infinity,
+                            ease: "linear"
+                          }}
+                          className="mb-4"
+                        >
+                          <RefreshCw className="w-8 h-8 text-gray-400/80" />
+                        </motion.div>
+                        
+                        <div className="w-full max-w-[200px] h-1.5 bg-gray-200/30 rounded-full overflow-hidden">
+                          <motion.div
+                            initial={{ width: "0%" }}
+                            animate={{ 
+                              width: "100%",
+                            }}
+                            transition={{ 
+                              duration: 3,
+                              ease: "easeInOut",
+                              repeat: Infinity,
+                            }}
+                            className="h-full bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500 rounded-full"
+                          />
+                        </div>
+                        
+                        <motion.div
+                          initial={{ opacity: 0, y: 10 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          transition={{ delay: 0.2 }}
+                          className="mt-4 text-sm text-gray-500 text-center font-medium"
+                        >
+                          Creating your masterpiece...
+                        </motion.div>
+
+                        <motion.div
+                          className="absolute inset-0 bg-gradient-to-r from-blue-500/10 via-purple-500/10 to-pink-500/10"
                           animate={{
-                            x: ['0%', '100%', '0%'],
+                            opacity: [0.5, 0.8, 0.5],
+                            scale: [1, 1.02, 1],
+                          }}
+                          transition={{
+                            duration: 2,
+                            repeat: Infinity,
+                            ease: "easeInOut"
+                          }}
+                        />
+                        
+                        <motion.div 
+                          className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent"
+                          animate={{
+                            x: ['-100%', '100%'],
                           }}
                           transition={{
                             duration: 1.5,
@@ -379,12 +442,6 @@ function ImagineContent() {
                           }}
                         />
                       </div>
-                      <motion.div
-                        animate={{ rotate: 360 }}
-                        transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
-                      >
-                        <RefreshCw className="w-6 h-6 text-gray-400" />
-                      </motion.div>
                     </m.div>
                   )}
                   
@@ -396,15 +453,16 @@ function ImagineContent() {
                         initial="hidden"
                         animate="visible"
                         exit="exit"
+                        whileHover="hover"
+                        layout="position"
+                        layoutId={`image-${imageSession.id}`}
                         className="relative aspect-square rounded-2xl overflow-hidden
-                          shadow-lg hover:shadow-xl transition-all duration-300
+                          shadow-lg hover:shadow-xl transition-all duration-200
                           bg-white/50 backdrop-blur-sm border border-white/20
                           cursor-pointer group transform-gpu will-change-transform"
                         style={{
                           perspective: "1000px",
-                          backfaceVisibility: "hidden",
-                          // Add staggered animation delay based on index
-                          transitionDelay: `${index * 50}ms`
+                          backfaceVisibility: "hidden"
                         }}
                         onClick={() => {
                           setSelectedImage(imageSession.image_url);
@@ -448,9 +506,12 @@ function ImagineContent() {
                   </AnimatePresence>
                   {historyImages.length > visibleImages && (
                     <m.div
-                      initial={{ opacity: 0, y: 20 }}
+                      initial={{ opacity: 0, y: 10 }}
                       animate={{ opacity: 1, y: 0 }}
-                      transition={{ duration: 0.3 }}
+                      transition={{ 
+                        duration: 0.2,
+                        ease: "easeOut"
+                      }}
                       className="col-span-full flex justify-center my-4"
                     >
                       <Button

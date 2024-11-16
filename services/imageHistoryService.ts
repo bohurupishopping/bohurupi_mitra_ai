@@ -100,7 +100,7 @@ export class ImageHistoryService {
       // Get the storage path first
       const { data: imageData, error: fetchError } = await this.supabase
         .from('image_history')
-        .select('storage_path, session_id')
+        .select('storage_path')
         .eq('id', id)
         .eq('user_id', user.id)
         .single();
@@ -109,15 +109,10 @@ export class ImageHistoryService {
 
       // Delete from storage if path exists
       if (imageData?.storage_path) {
-        try {
-          await deleteImageFromStorage(imageData.storage_path);
-        } catch (storageError) {
-          console.error('Error deleting from storage:', storageError);
-          // Continue with database deletion even if storage deletion fails
-        }
+        await deleteImageFromStorage(imageData.storage_path);
       }
 
-      // Delete from database
+      // Delete from database only after successful storage deletion
       const { error: dbError } = await this.supabase
         .from('image_history')
         .delete()

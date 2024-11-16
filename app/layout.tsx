@@ -7,8 +7,11 @@ import { ThemeProvider } from "@/components/theme-provider";
 const inter = Inter({ subsets: ['latin'] });
 
 export const metadata: Metadata = {
-  title: 'Modern Auth | Login',
-  description: 'Secure authentication with modern UI',
+  title: 'Bohurupi AI',
+  description: 'Bohurupi AI - Multi-Model Conversation Interface',
+  icons: {
+    icon: '/assets/ai-icon.png',
+  },
 };
 
 export default function RootLayout({

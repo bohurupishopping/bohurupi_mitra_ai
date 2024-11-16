@@ -53,6 +53,12 @@ export async function deleteImageFromStorage(storagePath: string): Promise<void>
   const supabase = createClientComponentClient<Database>();
   
   try {
+    // Extract the filename from the storage path
+    const filename = storagePath.split('/').pop();
+    if (!filename) {
+      throw new Error('Invalid storage path');
+    }
+
     // Delete the file from storage
     const { error } = await supabase
       .storage

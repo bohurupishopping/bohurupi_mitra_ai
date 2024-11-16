@@ -29,7 +29,7 @@ const MODEL_CONFIGS = [
   },
   { 
     provider: 'Google',
-    value: 'gemini-1.5-pro-002',
+    value: 'gemini-1.5-pro',
     label: 'Gemini 1.5 Pro',
     icon: Lightbulb,
     color: 'text-red-500',

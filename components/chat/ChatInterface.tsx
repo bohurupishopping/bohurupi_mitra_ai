@@ -2,7 +2,7 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Send, Search, Settings, MoreVertical, X, Copy, Check, Trash2, Save, BookOpen, Upload, Image as ImageIcon, File, RefreshCw } from 'lucide-react';
+import { Send, Search, Settings, MoreVertical, X, Copy, Check, Trash2, Save, BookOpen, Upload, Image as ImageIcon, File, RefreshCw, LineChart, BarChart4, TrendingUp } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
@@ -17,11 +17,15 @@ import { useAIGeneration } from './logic-ai-generation';
 import { StoryCreationPopup } from './StoryCreationPopup';
 import { StoryRewriterPopup } from './StoryRewriterPopup';
 import { ChatMessage } from '@/services/conversationService';
+import { SEOOptimizerPopup } from './SEOOptimizerPopup';
+import { uploadAttachment } from '@/utils/attachmentUtils';
+import { v4 as uuidv4 } from 'uuid';
 
 interface Message {
   role: 'user' | 'assistant';
   content: string;
   timestamp?: string;
+  attachments?: string[];
 }
 
 interface ChatInterfaceProps {
@@ -37,6 +41,7 @@ interface FileUpload {
   type: 'image' | 'document';
   uploading: boolean;
   url?: string;
+  path?: string;
 }
 
 const stripHtmlAndFormatText = (html: string): string => {
@@ -84,82 +89,108 @@ const stripHtmlAndFormatText = (html: string): string => {
 };
 
 // Update the message container and text styling
-const messageContainerStyles = `flex-1 overflow-y-auto scrollbar-thin scrollbar-thumb-black/10 
-  scrollbar-track-transparent hover:scrollbar-thumb-black/20 
-  transition-colors duration-200 scroll-smooth
-  overscroll-y-contain momentum-scroll
+const messageContainerStyles = `flex-1 overflow-y-auto
+  scrollbar-thin scrollbar-thumb-black/10 dark:scrollbar-thumb-white/10
+  scrollbar-track-transparent 
+  hover:scrollbar-thumb-black/20 dark:hover:scrollbar-thumb-white/20
+  motion-safe:transition-colors motion-safe:duration-200 
+  scroll-smooth overscroll-y-contain momentum-scroll
   [-webkit-overflow-scrolling:touch]
   [scroll-behavior:smooth]
   will-change-scroll
   px-2 sm:px-4 py-2 sm:py-4 
-  space-y-2 sm:space-y-3 
+  space-y-2.5 sm:space-y-3.5 
   relative z-10`;
 
+// Update the message styles with enhanced glassmorphism
 const messageStyles = {
-  user: `bg-gradient-to-r from-blue-600 to-blue-500 
+  user: `bg-gradient-to-br from-blue-500/90 to-blue-600/90 
     text-[0.925rem] sm:text-base leading-relaxed
-    shadow-lg hover:shadow-xl transition-shadow duration-200
-    text-white/95`,
-  assistant: `bg-white/50 backdrop-blur-[10px] 
+    shadow-lg hover:shadow-xl transition-all duration-300
+    text-white/95 backdrop-blur-md
+    border border-blue-400/30
+    dark:from-blue-600/80 dark:to-blue-700/80 
+    dark:border-blue-500/20`,
+  assistant: `bg-white/50 backdrop-blur-xl 
     text-[0.925rem] sm:text-base leading-relaxed
-    border border-white/20 text-gray-800
-    shadow-sm hover:shadow-md transition-shadow duration-200`
+    border border-white/30 text-gray-800
+    shadow-sm hover:shadow-md transition-all duration-300
+    dark:bg-white/10 dark:border-white/10 dark:text-gray-100
+    hover:bg-white/60 dark:hover:bg-white/15
+    motion-safe:transition-[background,border,shadow] motion-safe:duration-300`
 };
 
 // Update the typing effect utilities
-const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
-
 const typeText = async (
   text: string, 
   callback: (partial: string) => void, 
-  speed: number = 2  // Even faster base speed
+  speed: number = 1.5
 ) => {
   let partial = '';
-  // Optimized tokenization for faster processing
   const tokens = text.split(/(\s+|\n|#{1,3}\s|`{1,3}|\*{1,2}|>|-)/).filter(Boolean);
   let buffer = '';
-  let lastUpdate = Date.now();
-  const updateThreshold = 8; // ~120fps for smoother updates
+  let lastUpdate = performance.now();
+  const updateThreshold = 1000 / 144; // 120fps for ultra-smooth updates
 
-  // Process tokens in chunks for better performance
-  const chunkSize = 3; // Process multiple tokens per iteration
-  for (let i = 0; i < tokens.length; i += chunkSize) {
-    const chunk = tokens.slice(i, i + chunkSize);
+  const processChunk = async (startIndex: number, chunkSize: number) => {
+    const endIndex = Math.min(startIndex + chunkSize, tokens.length);
     
-    for (const token of chunk) {
+    for (let i = startIndex; i < endIndex; i++) {
+      const token = tokens[i];
       partial += token;
       buffer += token;
+      
+      const now = performance.now();
+      if (now - lastUpdate >= updateThreshold) {
+        await new Promise(resolve => requestAnimationFrame(resolve));
+        callback(partial);
+        buffer = '';
+        lastUpdate = now;
+      }
     }
-    
-    const now = Date.now();
-    // More frequent updates for smoother appearance
-    if (now - lastUpdate >= updateThreshold) {
-      callback(partial);
-      buffer = '';
-      lastUpdate = now;
+
+    if (endIndex < tokens.length) {
+      await new Promise(resolve => setTimeout(resolve, 0));
+      return processChunk(endIndex, chunkSize);
     }
+  };
 
-    // Faster dynamic speed adjustments
-    const delay = 
-      chunk.some(token => token.match(/^#{1,3}\s/)) ? 100 : // Headers
-      chunk.some(token => token.match(/^```/)) ? 80 : // Code blocks
-      chunk.some(token => token.match(/^`[^`]/)) ? 50 : // Inline code
-      chunk.some(token => token.match(/^\*{1,2}[^*]/)) ? 40 : // Emphasis
-      chunk.some(token => token.match(/^>/)) ? 60 : // Blockquotes
-      chunk.some(token => token.match(/^-/)) ? 50 : // List items
-      chunk.some(token => token.includes('\n')) ? 50 : // Line breaks
-      chunk.some(token => token.match(/[.,!?]$/)) ? 40 : // Punctuation
-      chunk.some(token => token.match(/[;:]$/)) ? 30 : // Semicolons/colons
-      Math.max(5, chunk.join('').length * speed); // Base typing speed
-
-    await sleep(delay);
-  }
-
-  // Final update to ensure all content is displayed
+  await processChunk(0, 5); // Process 5 tokens at a time for better performance
+  
   if (buffer) {
     callback(partial);
   }
 };
+
+// Update the message animation for smoother transitions
+const messageAnimation = {
+  initial: { 
+    opacity: 0, 
+    y: 10, 
+    scale: 0.98 
+  },
+  animate: { 
+    opacity: 1, 
+    y: 0, 
+    scale: 1,
+    transition: {
+      type: "spring",
+      stiffness: 500,
+      damping: 30,
+      mass: 0.8,
+      velocity: 2
+    }
+  },
+  exit: { 
+    opacity: 0, 
+    y: -10, 
+    scale: 0.98,
+    transition: {
+      duration: 0.2,
+      ease: "easeOut"
+    }
+  }
+} as const;
 
 function ChatInterface({ defaultMessage, sessionId, onModelChange }: ChatInterfaceProps) {
   const [conversationService] = useState(() => new ConversationService(sessionId));
@@ -193,6 +224,7 @@ function ChatInterface({ defaultMessage, sessionId, onModelChange }: ChatInterfa
   const [attachments, setAttachments] = useState<FileUpload[]>([]);
   const [isStoryCreatorOpen, setIsStoryCreatorOpen] = useState(false);
   const [isStoryRewriterOpen, setIsStoryRewriterOpen] = useState(false);
+  const [isSEOOptimizerOpen, setIsSEOOptimizerOpen] = useState(false);
 
   useEffect(() => {
     if (messagesEndRef.current) {
@@ -236,18 +268,43 @@ function ChatInterface({ defaultMessage, sessionId, onModelChange }: ChatInterfa
     if (!files) return;
 
     const newAttachments: FileUpload[] = [];
+    const maxSize = 50 * 1024 * 1024; // 50MB
+    const allowedTypes = [
+      'image/jpeg',
+      'image/png',
+      'image/gif',
+      'application/pdf',
+      'application/msword',
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      'text/plain'
+    ];
 
     for (let i = 0; i < files.length; i++) {
       const file = files[i];
-      const isImage = file.type.startsWith('image/');
-      const isDocument = file.type === 'application/pdf' || 
-                        file.type === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' ||
-                        file.type === 'text/plain';
       
-      if (!isImage && !isDocument) continue;
+      // Validate file type and size
+      if (!allowedTypes.includes(file.type)) {
+        toast({
+          title: "Invalid file type",
+          description: `${file.name} is not a supported file type`,
+          variant: "destructive"
+        });
+        continue;
+      }
 
+      if (file.size > maxSize) {
+        toast({
+          title: "File too large",
+          description: `${file.name} exceeds the 50MB limit`,
+          variant: "destructive"
+        });
+        continue;
+      }
+
+      const isImage = file.type.startsWith('image/');
+      
       const attachment: FileUpload = {
-        id: Math.random().toString(36).substr(2, 9),
+        id: uuidv4(),
         file,
         type: isImage ? 'image' : 'document',
         uploading: true
@@ -261,6 +318,27 @@ function ChatInterface({ defaultMessage, sessionId, onModelChange }: ChatInterfa
     }
 
     setAttachments(prev => [...prev, ...newAttachments]);
+
+    // Upload files to Supabase
+    try {
+      for (const attachment of newAttachments) {
+        const { url, path } = await uploadAttachment(attachment.file);
+        
+        // Update attachment with URL and path
+        setAttachments(prev => prev.map(att => 
+          att.id === attachment.id 
+            ? { ...att, url, path, uploading: false }
+            : att
+        ));
+      }
+    } catch (error) {
+      console.error('Error uploading attachments:', error);
+      toast({
+        title: "Upload Error",
+        description: "Failed to upload one or more files",
+        variant: "destructive"
+      });
+    }
 
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
@@ -314,9 +392,14 @@ function ChatInterface({ defaultMessage, sessionId, onModelChange }: ChatInterfa
     e.preventDefault();
     if ((!prompt.trim() && attachments.length === 0) || isLoading) return;
 
+    const attachmentUrls = attachments
+      .filter(att => att.url)
+      .map(att => att.url as string);
+
     const userMessage: Message = {
       role: 'user',
-      content: prompt
+      content: prompt,
+      attachments: attachmentUrls
     };
 
     setMessages(prev => [...prev, userMessage]);
@@ -388,28 +471,33 @@ function ChatInterface({ defaultMessage, sessionId, onModelChange }: ChatInterfa
       px-2 sm:px-4 md:px-6 lg:px-8 py-0 sm:p-1 
       w-full max-w-[1600px] mx-auto">
       <Card className="flex-1 mx-0.5 my-0.5 sm:m-2 
-        bg-white/60 backdrop-blur-[12px] 
+        bg-white/40 dark:bg-gray-900/40 
+        backdrop-blur-[20px] 
         rounded-2xl sm:rounded-[2rem] 
-        border border-white/20 
-        shadow-[0_8px_40px_rgba(0,0,0,0.08)] 
+        border border-white/20 dark:border-white/10 
+        shadow-[0_8px_40px_rgba(0,0,0,0.08)] dark:shadow-[0_8px_40px_rgba(0,0,0,0.2)]
         relative flex flex-col overflow-hidden
         w-full max-w-[1400px] mx-auto
-        h-[calc(100dvh-20px)] sm:h-[calc(98dvh-16px)]">
+        h-[calc(100dvh-20px)] sm:h-[calc(98dvh-16px)]
+        motion-safe:transition-all motion-safe:duration-300">
         
-        <div className="absolute inset-0 rounded-[2rem] sm:rounded-[2.5rem] animate-glow">
+        <div className="absolute inset-0 rounded-[2rem] sm:rounded-[2.5rem]">
           <div className="absolute inset-0 rounded-[2rem] sm:rounded-[2.5rem] 
-            bg-gradient-to-r from-blue-500/20 via-purple-500/20 to-pink-500/20 
-            blur-xl opacity-50 animate-gradient-x">
+            bg-gradient-to-r from-blue-500/10 via-purple-500/10 to-pink-500/10 
+            dark:from-blue-400/20 dark:via-purple-400/20 dark:to-pink-400/20
+            blur-2xl opacity-50 animate-gradient-x
+            motion-safe:transition-opacity motion-safe:duration-500">
           </div>
         </div>
 
         <CardHeader 
-          className="border-b border-white/20 
+          className="border-b border-white/20 dark:border-white/10 
             px-2 sm:px-6 py-1.5 sm:py-3
             flex flex-row justify-between items-center 
-            bg-white/40 backdrop-blur-[10px]
+            bg-white/30 dark:bg-gray-900/30 backdrop-blur-xl
             relative z-10
-            h-auto sm:h-auto flex-shrink-0"
+            h-auto sm:h-auto flex-shrink-0
+            motion-safe:transition-colors motion-safe:duration-300"
         >
           <div className="flex items-center space-x-2">
             <Avatar className="w-6 h-6 sm:w-10 sm:h-10">
@@ -484,6 +572,9 @@ function ChatInterface({ defaultMessage, sessionId, onModelChange }: ChatInterfa
             <Button variant="ghost" size="icon" className="h-8 w-8 sm:h-10 sm:w-10 rounded-full" onClick={() => setIsStoryRewriterOpen(true)}>
               <RefreshCw className="w-4 h-4 sm:w-5 sm:h-5" />
             </Button>
+            <Button variant="ghost" size="icon" className="h-8 w-8 sm:h-10 sm:w-10 rounded-full" onClick={() => setIsSEOOptimizerOpen(true)}>
+              <TrendingUp className="w-4 h-4 sm:w-5 sm:h-5" />
+            </Button>
             <Button variant="ghost" size="icon" className="h-8 w-8 sm:h-10 sm:w-10 rounded-full">
               <Settings className="w-4 h-4 sm:w-5 sm:h-5" />
             </Button>
@@ -523,21 +614,15 @@ function ChatInterface({ defaultMessage, sessionId, onModelChange }: ChatInterfa
               {(searchQuery ? filteredMessages : messages).map((message, index) => (
                 <motion.div
                   key={index}
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -10 }}
-                  transition={{ 
-                    type: "spring",
-                    stiffness: 500,
-                    damping: 30,
-                    mass: 0.8
-                  }}
+                  {...messageAnimation}
                   className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'} 
-                    transform-gpu will-change-transform`}
+                    transform-gpu will-change-transform
+                    group/message`}
                 >
                   <div className={`flex items-start space-x-1.5 sm:space-x-2 
                     max-w-[88%] sm:max-w-[80%] lg:max-w-[75%]
-                    ${message.role === 'user' ? 'flex-row-reverse space-x-reverse' : ''}`}>
+                    ${message.role === 'user' ? 'flex-row-reverse space-x-reverse' : ''}
+                    group-hover/message:translate-y-[-1px] transition-transform duration-200`}>
                     <Avatar className="w-6 h-6 sm:w-8 sm:h-8 mt-0.5 flex-shrink-0">
                       <AvatarImage 
                         src={message.role === 'user' ? "/assets/pritam-img.png" : "/assets/ai-icon.png"} 
@@ -625,27 +710,29 @@ function ChatInterface({ defaultMessage, sessionId, onModelChange }: ChatInterfa
             
             {isTyping && (
               <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -20 }}
+                initial={{ opacity: 0, y: 10, scale: 0.98 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                exit={{ opacity: 0, y: -10, scale: 0.98 }}
                 transition={{ type: "spring", stiffness: 500, damping: 30 }}
                 className="flex justify-start"
               >
-                <div className="flex items-center space-x-2 px-4 py-3 rounded-xl bg-white/50">
+                <div className="flex items-center space-x-2 px-4 py-3 rounded-xl 
+                  bg-white/60 backdrop-blur-xl border border-white/30
+                  shadow-sm transition-all duration-300">
                   <motion.div
                     animate={{ scale: [1, 1.2, 1] }}
-                    transition={{ repeat: Infinity, duration: 1, repeatDelay: 0.2 }}
-                    className="w-2 h-2 bg-blue-500 rounded-full"
+                    transition={{ repeat: Infinity, duration: 0.8, repeatDelay: 0.1 }}
+                    className="w-2 h-2 bg-blue-500/80 rounded-full"
                   />
                   <motion.div
                     animate={{ scale: [1, 1.2, 1] }}
-                    transition={{ repeat: Infinity, duration: 1, delay: 0.2, repeatDelay: 0.2 }}
-                    className="w-2 h-2 bg-blue-500 rounded-full"
+                    transition={{ repeat: Infinity, duration: 0.8, delay: 0.2, repeatDelay: 0.1 }}
+                    className="w-2 h-2 bg-blue-500/80 rounded-full"
                   />
                   <motion.div
                     animate={{ scale: [1, 1.2, 1] }}
-                    transition={{ repeat: Infinity, duration: 1, delay: 0.4, repeatDelay: 0.2 }}
-                    className="w-2 h-2 bg-blue-500 rounded-full"
+                    transition={{ repeat: Infinity, duration: 0.8, delay: 0.4, repeatDelay: 0.1 }}
+                    className="w-2 h-2 bg-blue-500/80 rounded-full"
                   />
                 </div>
               </motion.div>
@@ -659,11 +746,15 @@ function ChatInterface({ defaultMessage, sessionId, onModelChange }: ChatInterfa
               <form onSubmit={handleSubmit} className="space-y-4">
                 <div className="relative group">
                   <div className="absolute -inset-1 bg-gradient-to-r from-purple-500/20 to-blue-500/20 
-                    rounded-[2rem] blur opacity-75 group-hover:opacity-100 transition duration-300">
+                    dark:from-purple-400/30 dark:to-blue-400/30
+                    rounded-[2rem] blur opacity-75 group-hover:opacity-100 
+                    motion-safe:transition-opacity motion-safe:duration-300">
                   </div>
                   <div className="relative rounded-[2.5rem] overflow-hidden 
-                    bg-white/10 backdrop-blur-md border border-white/20 
-                    shadow-lg group-hover:shadow-xl transition-all duration-300">
+                    bg-white/20 dark:bg-gray-900/20 backdrop-blur-xl 
+                    border border-white/20 dark:border-white/10 
+                    shadow-lg group-hover:shadow-xl 
+                    motion-safe:transition-all motion-safe:duration-300">
                     
                     {attachments.length > 0 && (
                       <div className="flex flex-wrap gap-2 p-2 border-b border-gray-200/30">
@@ -798,6 +889,14 @@ function ChatInterface({ defaultMessage, sessionId, onModelChange }: ChatInterfa
         <StoryRewriterPopup
           isOpen={isStoryRewriterOpen}
           onClose={() => setIsStoryRewriterOpen(false)}
+          onSubmit={(prompt: string) => {
+            setPrompt(prompt);
+            handleSubmit(new Event('submit') as any);
+          }}
+        />
+        <SEOOptimizerPopup
+          isOpen={isSEOOptimizerOpen}
+          onClose={() => setIsSEOOptimizerOpen(false)}
           onSubmit={(prompt: string) => {
             setPrompt(prompt);
             handleSubmit(new Event('submit') as any);

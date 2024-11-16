@@ -86,5 +86,11 @@ const config: Config = {
     },
   },
   plugins: [require('tailwindcss-animate')],
+  variants: {
+    extend: {
+      animation: ['motion-safe'],
+      transition: ['motion-safe'],
+    },
+  },
 };
 export default config;

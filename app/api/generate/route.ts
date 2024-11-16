@@ -5,6 +5,7 @@ import { createMistral } from '@ai-sdk/mistral/dist';
 import { createGroq } from '@ai-sdk/groq/dist';
 import { generateText } from 'ai';
 import { GoogleGenerativeAI } from "@google/generative-ai";
+import Groq from 'groq-sdk';
 
 // Initialize clients with server-side env variables
 const openRouterClient = new OpenAI({
@@ -16,6 +17,9 @@ const openRouterClient = new OpenAI({
   }
 });
 
+const mistralClient = createMistral({
+  apiKey: process.env.MISTRAL_API_KEY || ''
+});
 const xai = createOpenAI({
   name: 'xai',
   baseURL: 'https://api.x.ai/v1',
@@ -27,11 +31,7 @@ const togetherClient = new OpenAI({
   baseURL: 'https://api.together.xyz/v1',
 });
 
-const mistralClient = createMistral({
-  apiKey: process.env.MISTRAL_API_KEY || ''
-});
-
-const groqClient = createGroq({
+const groqClient = new Groq({
   apiKey: process.env.GROQ_API_KEY || ''
 });
 
@@ -41,6 +41,7 @@ const googleAI = new GoogleGenerativeAI(process.env.GOOGLE_API_KEY || '');
 export async function POST(req: Request) {
   try {
     const { model, prompt, options } = await req.json();
+    let result: string | null = null;
 
     // Handle Hermes model streaming first
     if (model === 'nousresearch/hermes-3-llama-3.1-405b:free') {
@@ -97,16 +98,12 @@ export async function POST(req: Request) {
       });
     }
 
-    // Handle other models as before...
-    let result;
-
-    // Handle Google AI models with streaming for Gemini 1.5 Pro
-    if (model.startsWith('gemini-')) {
+    // Handle Gemini models
+    else if (model.startsWith('gemini-')) {
       const modelName = model;
       const googleModel = googleAI.getGenerativeModel({ model: modelName });
       
       if (model === 'gemini-1.5-pro') {
-        // Use streaming for Gemini 1.5 Pro
         const response = await googleModel.generateContentStream(prompt);
         let fullText = '';
         
@@ -117,7 +114,6 @@ export async function POST(req: Request) {
         
         result = fullText;
       } else {
-        // Use regular generation for other Gemini models
         const response = await googleModel.generateContent(prompt);
         result = response.response.text();
       }
@@ -133,7 +129,7 @@ export async function POST(req: Request) {
         top_p: options?.topP || 0.4
       });
 
-      result = response.choices[0]?.message?.content;
+      result = response.choices[0]?.message?.content || null;
     } 
     // Handle OpenRouter models
     else if (model.includes('/')) {
@@ -146,38 +142,55 @@ export async function POST(req: Request) {
         stream: false
       });
 
-      result = response.choices[0]?.message?.content;
+      result = response.choices[0]?.message?.content || null;
     }
     // Handle other models
     else {
-      let modelInstance;
-      switch (model) {
-        case 'open-mistral-nemo':
-          modelInstance = mistralClient('open-mistral-nemo');
-          break;
-        case 'mistral-large':
-          modelInstance = mistralClient('mistral-large-2407');
-          break;
-        case 'groq':
-          modelInstance = groqClient('llama-3.2-90b-vision-preview');
-          break;
-        case 'xai':
-          modelInstance = xai('grok-beta');
-          break;
-        default:
-          throw new Error('Invalid model selected');
+      if (model === 'groq') {
+        const hasImageUrl = prompt.match(/https?:\/\/[^\s]+\.(jpg|jpeg|png|gif|webp)/i);
+        
+        const response = await groqClient.chat.completions.create({
+          model: "llama-3.2-90b-vision-preview",
+          messages: hasImageUrl 
+            ? [{ 
+                role: "user", 
+                content: [{ type: "text", text: prompt }] 
+              }]
+            : [{ role: "user", content: prompt }],
+          max_tokens: options?.maxTokens || 4096,
+          temperature: options?.temperature || 0.7,
+          top_p: options?.topP || 0.4,
+          stream: false
+        });
+
+        result = response.choices[0]?.message?.content || null;
+      } else {
+        let modelInstance;
+        
+        switch (model) {
+          case 'open-mistral-nemo':
+            modelInstance = mistralClient('open-mistral-nemo');
+            break;
+          case 'mistral-large':
+            modelInstance = mistralClient('mistral-large-2407');
+            break;
+          case 'xai':
+            modelInstance = xai('grok-beta');
+            break;
+          default:
+            throw new Error('Invalid model selected');
+        }
+
+        const response = await generateText({
+          model: modelInstance,
+          messages: [{ role: 'user', content: prompt }],
+          maxTokens: options?.maxTokens || 4096,
+          temperature: options?.temperature || 0.7,
+          topP: options?.topP || 0.4,
+        });
+
+        result = response.text;
       }
-
-      // Use generateText for AI SDK models
-      const response = await generateText({
-        model: modelInstance,
-        messages: [{ role: 'user', content: prompt }],
-        maxTokens: options?.maxTokens || 4096,
-        temperature: options?.temperature || 0.7,
-        topP: options?.topP || 0.4,
-      });
-
-      result = response.text;
     }
 
     if (!result) {

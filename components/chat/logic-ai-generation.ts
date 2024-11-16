@@ -24,7 +24,7 @@ export const useAIGeneration = (props?: UseAIGenerationProps) => {
     const modelMap: { [key: string]: string } = {
       'gemini-1.5-pro': 'Gemini 1.5 Pro',
       'gemini-1.5-flash': 'Gemini 1.5 Flash',
-      'groq': 'Llama 3.2 90B',
+      'groq': 'Llama 3.2 90B Vision',
       'open-mistral-nemo': 'Open Mistral Nemo',
       'mistral-large': 'Mistral Large',
       'xai': 'Grok',
@@ -152,7 +152,6 @@ Please provide an appropriate response.` : newPrompt;
         }
       }
       
-      // Check if the prompt is asking about model identity
       const isModelQuery = prompt.toLowerCase().includes('which model') || 
                           prompt.toLowerCase().includes('what model') ||
                           prompt.toLowerCase().includes('who are you');
@@ -185,13 +184,11 @@ Please provide an appropriate response.` : newPrompt;
       if (data.result) {
         let finalResponse = data.result;
 
-        // Add model identity if needed
         if (isModelQuery) {
           const modelName = getModelDisplayName(modelToUse);
           finalResponse = `I am ${modelName}, an AI language model. ${finalResponse}`;
         }
 
-        // Save the conversation after successful generation
         await conversationService.saveConversation(prompt, finalResponse);
         setGeneratedContent(finalResponse);
         return finalResponse;

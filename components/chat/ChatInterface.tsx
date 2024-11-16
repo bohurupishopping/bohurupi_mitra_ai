@@ -130,9 +130,9 @@ const typeText = async (
   const tokens = text.split(/(\s+|\n|#{1,3}\s|`{1,3}|\*{1,2}|>|-)/).filter(Boolean);
   let buffer = '';
   let lastUpdate = performance.now();
-  const updateThreshold = 1000 / 144; // 120fps for ultra-smooth updates
+  const updateThreshold = 1000 / 120; // 120fps for ultra-smooth updates
 
-  const processChunk = async (startIndex: number, chunkSize: number) => {
+  const processChunk = async (startIndex: number, chunkSize: number): Promise<void> => {
     const endIndex = Math.min(startIndex + chunkSize, tokens.length);
     
     for (let i = startIndex; i < endIndex; i++) {

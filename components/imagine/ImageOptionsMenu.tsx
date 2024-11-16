@@ -1,6 +1,6 @@
 "use client";
 
-import { MoreVertical, Check } from 'lucide-react';
+import { MoreVertical } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -14,9 +14,10 @@ import {
 interface ImageOptionsMenuProps {
   onModelChange: (model: string) => void;
   onSizeChange: (size: string) => void;
+  onStyleChange: (style: string) => void;
 }
 
-export default function ImageOptionsMenu({ onModelChange, onSizeChange }: ImageOptionsMenuProps) {
+export default function ImageOptionsMenu({ onModelChange, onSizeChange, onStyleChange }: ImageOptionsMenuProps) {
   const models = [
     {
       id: 'black-forest-labs/FLUX.1-schnell-Free',

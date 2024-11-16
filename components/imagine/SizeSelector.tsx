@@ -47,8 +47,7 @@ export default function SizeSelector({ onSizeChange }: SizeSelectorProps) {
       <DropdownMenuTrigger asChild>
         <Button
           variant="outline"
-          size="sm"
-          className="flex items-center gap-1 h-8 px-2 
+          className="flex items-center gap-1.5 h-8 px-2.5 
             bg-white/10 backdrop-blur-md border border-white/20
             hover:bg-white/20 transition-all duration-300
             rounded-xl text-xs font-medium text-gray-700"
@@ -59,23 +58,23 @@ export default function SizeSelector({ onSizeChange }: SizeSelectorProps) {
       </DropdownMenuTrigger>
       <DropdownMenuContent
         align="end"
-        className="w-[120px] rounded-xl bg-white/90 backdrop-blur-xl
+        className="w-[160px] rounded-xl bg-white/90 backdrop-blur-xl
           border-white/20 shadow-lg p-1"
       >
         {sizes.map((size) => (
           <DropdownMenuItem
             key={size.id}
             onClick={() => handleSizeSelect(size.id)}
-            className="flex items-center justify-between px-2 py-1
+            className="flex items-center justify-between px-2 py-1.5
               text-xs cursor-pointer hover:bg-gray-100/50
               transition-colors duration-200 rounded-lg"
           >
-            <div className="flex flex-col gap-0.5">
+            <div className="flex flex-col">
               <span className="font-medium">{size.name}</span>
               <span className="text-[9px] text-gray-500">{size.description}</span>
             </div>
             {selectedSize === size.id && (
-              <Check className="h-3 w-3 text-blue-500" />
+              <Check className="h-3.5 w-3.5 text-blue-500" />
             )}
           </DropdownMenuItem>
         ))}

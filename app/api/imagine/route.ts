@@ -52,8 +52,8 @@ const formatEnhancedPrompt = (
   const enhancedPrompt = `
     ${mainPrompt}
     ${compositionGuide},
-    (photorealistic:1.4), (hyperrealistic:1.3), masterpiece, professional photography, 
-    8k resolution, highly detailed, sharp focus, HDR, high contrast,
+    (photorealistic:1.4), (hyperrealistic:1.3), masterpiece,  
+    8k resolution, highly detailed, sharp focus, HDR, 
     cinematic lighting, volumetric lighting, ambient occlusion, ray tracing, 
     professional color grading, dramatic atmosphere,
     shot on Hasselblad H6D-400C, 100mm f/2.8 lens, golden hour photography,
@@ -68,7 +68,17 @@ const formatEnhancedPrompt = (
     deformed, distorted, disfigured, 
     watermark, signature, text, logo,
     bad anatomy, bad proportions, amateur, unprofessional,
-    wrong aspect ratio, stretched image, poorly cropped
+    wrong aspect ratio, stretched image, poorly cropped,
+    without face tattoo, without text, without design on t-shirt,
+    flat lighting, awkward poses, lack of emotion, unclear symbolism,
+    generic patterns, bland textures, messy composition, pixelation,
+    amateurish expressions, disproportionate figures, artificial poses,
+    unnatural shadows, inconsistent style, overused symbols,
+    overemphasis on detail, clichéd lighting, poor resolution,
+    disconnected elements, unclear focal point, generic font,
+    repetitive poses, lack of depth, chaotic composition,
+    misaligned elements, dull colour palette, off-balance,
+    crowded, overused tropes
   `.trim();
 
   return {

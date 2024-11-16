@@ -14,6 +14,9 @@ import ImagePreview from '@/components/imagine/ImagePreview';
 import { ImageHistoryService, type ImageSession } from '@/services/imageHistoryService';
 import { useInView } from 'react-intersection-observer';
 import { LazyMotion, domAnimation, m } from 'framer-motion';
+import ImageTypeSelector from '@/components/imagine/ImageTypeSelector';
+import ModelSelector from '@/components/imagine/ModelSelector';
+import SizeSelector from '@/components/imagine/SizeSelector';
 
 function ImagineContent() {
   const [prompt, setPrompt] = useState('');
@@ -32,6 +35,7 @@ function ImagineContent() {
   const [visibleImages, setVisibleImages] = useState(6);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [isPreloading, setIsPreloading] = useState(false);
+  const [selectedStyle, setSelectedStyle] = useState('(photorealistic:1.4), (hyperrealistic:1.3), masterpiece, professional photography, 8k resolution, highly detailed, sharp focus, HDR, high contrast, cinematic lighting, volumetric lighting, ambient occlusion, ray tracing, professional color grading, dramatic atmosphere, shot on Hasselblad H6D-400C, 100mm f/2.8 lens, golden hour photography, detailed textures, intricate details, pristine quality, award-winning photography');
 
   // Add virtual scrolling ref
   const { ref: gridRef, inView } = useInView({
@@ -155,7 +159,11 @@ function ImagineContent() {
       const response = await fetch('/api/enhance-prompt', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ prompt }),
+        body: JSON.stringify({ 
+          prompt,
+          styleType: selectedStyle,
+          size: selectedSize
+        }),
       });
 
       const data = await response.json();
@@ -195,7 +203,7 @@ function ImagineContent() {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          prompt,
+          prompt: `${prompt}, ${selectedStyle}`,
           model: selectedModel,
           size: selectedSize,
         }),
@@ -479,6 +487,14 @@ function ImagineContent() {
                     bg-white/10 backdrop-blur-md border border-white/20 
                     shadow-lg group-hover:shadow-xl transition-all duration-300">
                     
+                    <div className="flex items-center justify-center gap-2 px-6 pt-4 pb-2">
+                      <div className="flex items-center gap-2 max-w-fit">
+                        <ImageTypeSelector onStyleChange={setSelectedStyle} />
+                        <ModelSelector onModelChange={setSelectedModel} />
+                        <SizeSelector onSizeChange={setSelectedSize} />
+                      </div>
+                    </div>
+
                     <Textarea
                       value={prompt}
                       onChange={(e) => {
@@ -509,10 +525,11 @@ function ImagineContent() {
                       border-t border-white/10 bg-white/5">
                       <div className="flex items-center gap-6 w-full max-w-2xl mx-auto px-4">
                         <div className="flex-shrink-0">
-                          <ImageOptionsMenu 
+                          {/* <ImageOptionsMenu 
                             onModelChange={setSelectedModel}
                             onSizeChange={setSelectedSize}
-                          />
+                            onStyleChange={setSelectedStyle}
+                          /> */}
                         </div>
                         
                         <div className="flex items-center justify-center flex-grow gap-3">

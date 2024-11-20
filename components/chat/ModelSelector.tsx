@@ -37,7 +37,7 @@ const MODEL_CONFIGS = [
   },
   { 
     provider: 'Google',
-    value: 'gemini-1.5-flash-002',
+    value: 'gemini-1.5-flash',
     label: 'Gemini 1.5 Flash',
     icon: Wand2,
     color: 'text-red-400',
@@ -52,8 +52,8 @@ const MODEL_CONFIGS = [
     bgColor: 'bg-blue-50',
   },
   { 
-    provider: 'Mistral',
-    value: 'mistral-large',
+    provider: 'Pixtral',
+    value: 'pixtral-large-latest',
     label: 'Large',
     icon: Brain,
     color: 'text-blue-600',

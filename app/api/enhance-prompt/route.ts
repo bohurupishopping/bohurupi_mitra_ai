@@ -99,7 +99,7 @@ export async function POST(request: Request) {
     const systemPrompt = getStyleSpecificSystemPrompt(styleType, size);
 
     const completion = await client.chat.completions.create({
-      model: 'llama-3.2-11b-text-preview',
+      model: 'llama-3.2-11b-vision-preview',
       messages: [
         {
           role: 'system',

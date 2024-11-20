@@ -7,6 +7,16 @@ interface UseAIGenerationProps {
   defaultModel?: string;
 }
 
+const getMaxTokens = (model: string) => {
+  if (model.startsWith('gemini-')) {
+    return 1000000;
+  }
+  if (model === 'pixtral-large-latest') {
+    return 128000;
+  }
+  return 8192; // default for other models
+};
+
 export const useAIGeneration = (props?: UseAIGenerationProps) => {
   const { 
     conversationService = new ConversationService(), 
@@ -97,7 +107,7 @@ Please provide an appropriate response.` : newPrompt;
             model: modelToUse,
             prompt: contextualPrompt,
             options: {
-              maxTokens: 4096,
+              maxTokens: getMaxTokens(modelToUse),
               temperature: 0.7,
               topP: 0.4
             }
@@ -115,6 +125,7 @@ Please provide an appropriate response.` : newPrompt;
         const decoder = new TextDecoder();
         
         let accumulatedText = '';
+        let buffer = '';
         
         try {
           while (true) {
@@ -122,7 +133,11 @@ Please provide an appropriate response.` : newPrompt;
             if (done) break;
             
             const chunk = decoder.decode(value);
-            const lines = chunk.split('\n');
+            buffer += chunk;
+            
+            // Process complete SSE messages
+            const lines = buffer.split('\n');
+            buffer = lines.pop() || ''; // Keep incomplete line in buffer
             
             for (const line of lines) {
               if (line.startsWith('data: ')) {
@@ -152,12 +167,13 @@ Please provide an appropriate response.` : newPrompt;
         }
       }
       
+      // For non-streaming models
       const isModelQuery = prompt.toLowerCase().includes('which model') || 
                           prompt.toLowerCase().includes('what model') ||
                           prompt.toLowerCase().includes('who are you');
 
       const options = {
-        maxTokens: 4096,
+        maxTokens: getMaxTokens(modelToUse),
         temperature: 0.7,
         topP: 0.4
       };
@@ -176,13 +192,19 @@ Please provide an appropriate response.` : newPrompt;
       });
 
       if (!response.ok) {
-        throw new Error('Failed to generate content');
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to generate content');
       }
 
       const data = await response.json();
 
       if (data.result) {
         let finalResponse = data.result;
+
+        // Check for truncated response
+        if (finalResponse.endsWith('...') || finalResponse.endsWith('…')) {
+          console.warn('Response appears to be truncated, consider increasing context window');
+        }
 
         if (isModelQuery) {
           const modelName = getModelDisplayName(modelToUse);

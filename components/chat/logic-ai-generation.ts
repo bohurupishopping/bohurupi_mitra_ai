@@ -8,8 +8,11 @@ interface UseAIGenerationProps {
 }
 
 const getMaxTokens = (model: string) => {
-  if (model.startsWith('gemini-')) {
+  if (model === 'gemini-1.5-pro') {
     return 1000000;
+  }
+  if (model === 'gemini-1.5-flash') {
+    return 128000;
   }
   if (model === 'pixtral-large-latest') {
     return 128000;

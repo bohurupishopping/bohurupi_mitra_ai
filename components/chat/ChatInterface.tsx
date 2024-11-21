@@ -192,6 +192,20 @@ const messageAnimation = {
   }
 } as const;
 
+// Update the getMaxTokens function at the top of the file
+const getMaxTokens = (model: string) => {
+  if (model === 'gemini-1.5-pro') {
+    return 1000000;
+  }
+  if (model === 'gemini-1.5-flash') {
+    return 128000;
+  }
+  if (model === 'pixtral-large-latest') {
+    return 128000;
+  }
+  return 8192; // default for other models
+};
+
 function ChatInterface({ defaultMessage, sessionId, onModelChange }: ChatInterfaceProps) {
   const [conversationService] = useState(() => new ConversationService(sessionId));
   const { selectedModel, setSelectedModel, generateContent } = useAIGeneration({ 
@@ -473,16 +487,6 @@ function ChatInterface({ defaultMessage, sessionId, onModelChange }: ChatInterfa
         }
       } else {
         // For non-streaming models
-        const getMaxTokens = (model: string) => {
-          if (model.startsWith('gemini-')) {
-            return 1000000;
-          }
-          if (model === 'pixtral-large-latest') {
-            return 128000;
-          }
-          return 8192; // default for other models
-        };
-
         const response = await fetch('/api/generate', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },

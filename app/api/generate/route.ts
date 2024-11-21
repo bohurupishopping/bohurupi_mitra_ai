@@ -105,36 +105,58 @@ export async function POST(req: Request) {
       const modelName = model;
       const googleModel = googleAI.getGenerativeModel({ model: modelName });
       
-      if (model === 'gemini-1.5-pro') {
-        // Use streaming for Gemini 1.5 Pro
-        const response = await googleModel.generateContentStream({
-          contents: [{ role: 'user', parts: [{ text: prompt }] }],
-          generationConfig: {
-            maxOutputTokens: 1000000,
-            temperature: options?.temperature || 0.7,
-            topP: options?.topP || 0.4
-          }
-        });
+      try {
+        if (model === 'gemini-1.5-pro') {
+          // Use streaming for Gemini Pro
+          const response = await googleModel.generateContentStream({
+            contents: [{ role: 'user', parts: [{ text: prompt }] }],
+            generationConfig: {
+              maxOutputTokens: 1000000,
+              temperature: options?.temperature || 0.7,
+              topP: options?.topP || 0.4
+            }
+          });
 
-        let fullText = '';
-        
-        for await (const chunk of response.stream) {
-          const chunkText = chunk.text();
-          fullText += chunkText;
-        }
-        
-        result = fullText;
-      } else {
-        // Use regular generation for other Gemini models
-        const response = await googleModel.generateContent({
-          contents: [{ role: 'user', parts: [{ text: prompt }] }],
-          generationConfig: {
-            maxOutputTokens: 1000000,
-            temperature: options?.temperature || 0.7,
-            topP: options?.topP || 0.4
+          let fullText = '';
+          
+          for await (const chunk of response.stream) {
+            const chunkText = chunk.text();
+            fullText += chunkText;
           }
-        });
-        result = response.response.text();
+          
+          result = fullText;
+        } 
+        else if (model === 'gemini-1.5-flash') {
+          // Handle Flash model with standard generation
+          const response = await googleModel.generateContent({
+            contents: [{ role: 'user', parts: [{ text: prompt }] }],
+            generationConfig: {
+              maxOutputTokens: 128000,
+              temperature: options?.temperature || 0.7,
+              topP: options?.topP || 0.4
+            }
+          });
+
+          if (!response.response) {
+            throw new Error('Empty response from Gemini Flash model');
+          }
+          result = response.response.text();
+        }
+        else {
+          // Handle other Gemini models
+          const response = await googleModel.generateContent({
+            contents: [{ role: 'user', parts: [{ text: prompt }] }],
+            generationConfig: {
+              maxOutputTokens: 1000000,
+              temperature: options?.temperature || 0.7,
+              topP: options?.topP || 0.4
+            }
+          });
+          result = response.response.text();
+        }
+      } catch (error: any) {
+        console.error('Gemini API error:', error);
+        throw new Error(`Gemini API error: ${error.message || 'Unknown error'}`);
       }
     }
     // Handle Together AI models

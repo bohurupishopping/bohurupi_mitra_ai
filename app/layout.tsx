@@ -7,8 +7,8 @@ import { ThemeProvider } from "@/components/theme-provider";
 const inter = Inter({ subsets: ['latin'] });
 
 export const metadata: Metadata = {
-  title: 'Bohurupi AI',
-  description: 'Bohurupi AI - Multi-Model Conversation Interface',
+  title: 'FeludaAI : Your Ultimate Magajastra',
+  description: 'FeludaAI - Your Ultimate Magajastra',
   icons: {
     icon: '/assets/ai-icon.png',
   },

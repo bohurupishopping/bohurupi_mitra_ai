@@ -8,7 +8,7 @@ const openRouterClient = new OpenAI({
   dangerouslyAllowBrowser: true,
   defaultHeaders: {
     "HTTP-Referer": typeof window !== 'undefined' ? window.location.origin : '',
-    "X-Title": "Creative Scribe",
+    "X-Title": "FeludaAI",
   }
 });
 

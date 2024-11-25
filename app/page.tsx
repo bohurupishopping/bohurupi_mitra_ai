@@ -6,12 +6,12 @@ import { AnimatedSections } from "@/components/home/animated-sections";
 export const dynamic = 'force-dynamic';
 
 export const metadata = {
-  title: 'Bohurupi AI - Multi LLM Artificial Intelligence Platform',
-  description: 'Experience the power of multiple language models in one platform. Bohurupi AI lets you interact with various LLMs, compare their responses, and choose the best AI model for your needs.',
-  keywords: 'Bohurupi AI, multiple LLMs, artificial intelligence, language models, AI platform, chatbot, Claude, GPT, AI comparison',
+  title: 'FeludaAI : Your Ultimate Magajastra',
+  description: 'Experience the power of multiple language models in one platform. FeludaAI lets you interact with various LLMs, compare their responses, and choose the best AI model for your needs.',
+  keywords: 'FeludaAI, multiple LLMs, artificial intelligence, language models, AI platform, chatbot, AI comparison',
   openGraph: {
-    title: 'Bohurupi AI - Multi LLM Artificial Intelligence Platform',
-    description: 'Experience the power of multiple language models in one platform. Bohurupi AI lets you interact with various LLMs, compare their responses, and choose the best AI model for your needs.',
+    title: 'FeludaAI : Your Ultimate Magajastra',
+    description: 'Experience the power of multiple language models in one platform. FeludaAI lets you interact with various LLMs, compare their responses, and choose the best AI model for your needs.',
     type: 'website',
     locale: 'en_US',
     images: [
@@ -19,14 +19,14 @@ export const metadata = {
         url: '/assets/ai-icon.png',
         width: 1200,
         height: 630,
-        alt: 'Bohurupi AI Platform',
+        alt: 'FeludaAI Platform',
       },
     ],
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'Bohurupi AI - Multi LLM Artificial Intelligence Platform',
-    description: 'Experience the power of multiple language models in one platform. Bohurupi AI lets you interact with various LLMs, compare their responses, and choose the best AI model for your needs.',
+    title: 'FeludaAI : Your Ultimate Magajastra',
+    description: 'Experience the power of multiple language models in one platform. FeludaAI lets you interact with various LLMs, compare their responses, and choose the best AI model for your needs.',
     images: ['/assets/ai-icon.png'],
   },
 };
@@ -49,7 +49,7 @@ export default function Home() {
             </div>
             <span className="text-lg font-semibold bg-gradient-to-r from-blue-600 to-purple-600 
               bg-clip-text text-transparent">
-              Bohurupi AI
+              FeludaAI
             </span>
           </div>
           
@@ -83,7 +83,7 @@ export default function Home() {
       <footer className="w-full py-6 px-6 border-t bg-background/50 backdrop-blur-xl">
         <div className="max-w-7xl mx-auto flex flex-col sm:flex-row justify-between items-center gap-4">
           <span className="text-sm text-muted-foreground">
-            © 2024 Bohurupi AI. All rights reserved.
+            © 2024 FeludaAI. All rights reserved.
           </span>
           <div className="flex items-center gap-6">
             <Link href="#" className="text-sm text-muted-foreground hover:text-foreground transition-colors">

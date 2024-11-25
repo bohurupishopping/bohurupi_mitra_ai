@@ -7,7 +7,7 @@ const openRouterClient = new OpenAI({
   apiKey: process.env.OPEN_ROUTER_API_KEY || '',
   defaultHeaders: {
     "HTTP-Referer": process.env.NEXT_PUBLIC_APP_URL,
-    "X-Title": "Creative Scribe",
+    "X-Title": "FeludaAI",
   }
 });
 
@@ -18,7 +18,7 @@ export async function GET() {
       headers: {
         'Authorization': `Bearer ${process.env.OPEN_ROUTER_API_KEY}`,
         'HTTP-Referer': process.env.NEXT_PUBLIC_APP_URL || '',
-        'X-Title': 'Creative Scribe',
+        'X-Title': 'FeludaAI',
       }
     });
 

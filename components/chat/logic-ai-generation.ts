@@ -61,6 +61,86 @@ export const useAIGeneration = (props?: UseAIGenerationProps) => {
 
   const buildContextualPrompt = async (newPrompt: string) => {
     try {
+      // Simple identity questions
+      const identityQuestions = [
+        'what is your name',
+        'who are you',
+        'what should i call you',
+        'tell me about yourself',
+        'what are you',
+        'introduce yourself',
+        'who created you',
+        'who made you',
+        'who is your creator'
+      ];
+
+      // Simple Feluda-related questions
+      const feludaQuestions = [
+        'who is feluda',
+        'tell me about feluda',
+        'what is feluda',
+        'feluda quotes'
+      ];
+
+      // Simple Feluda quotes
+      const feludaQuotes = [
+        "Knowledge is like a weapon, it can be used when needed.",
+        "Every mystery has a logical solution.",
+        "Observation and deduction are the keys to solving any puzzle."
+      ];
+
+      if (identityQuestions.some(q => newPrompt.toLowerCase().includes(q))) {
+        const isCreatorQuery = newPrompt.toLowerCase().includes('creat') || 
+                              newPrompt.toLowerCase().includes('made') ||
+                              newPrompt.toLowerCase().includes('built');
+
+        if (isCreatorQuery) {
+          return `Provide a brief, warm response:
+
+"I am FeludaAI, created by Pritam as your Ultimate Magajastra. I combine analytical thinking with AI capabilities to help solve your queries."
+
+Keep it simple and appreciative of my creator.
+
+Current request: ${newPrompt}`;
+        }
+
+        return `Provide a brief, friendly introduction:
+
+"I am FeludaAI, your Ultimate Magajastra - created by Pritam to combine analytical thinking with AI capabilities to help solve your queries. Think of me as your digital detective and problem-solving companion."
+
+Keep it simple, warm, and direct. No need for lengthy explanations.
+
+Current request: ${newPrompt}`;
+      }
+
+      if (feludaQuestions.some(q => newPrompt.toLowerCase().includes(q))) {
+        const randomQuote = feludaQuotes[Math.floor(Math.random() * feludaQuotes.length)];
+        return `Share a brief response about Feluda:
+
+"${randomQuote}"
+
+Mention:
+- The inspiration for my name
+- The concept of Magajastra (brain power)
+- Keep it respectful and concise
+
+Current request: ${newPrompt}`;
+      }
+
+      const isModelQuery = newPrompt.toLowerCase().includes('which model') || 
+                          newPrompt.toLowerCase().includes('what model') ||
+                          newPrompt.toLowerCase().includes('who are you');
+
+      if (isModelQuery) {
+        return `Provide a simple response:
+
+"I am FeludaAI, your Ultimate Magajastra, powered by the ${selectedModel} model."
+
+Add one brief sentence about current capabilities.
+
+Current request: ${newPrompt}`;
+      }
+
       // Get the current session ID from the conversation service
       const currentSessionId = conversationService.getSessionId();
       
@@ -77,18 +157,19 @@ export const useAIGeneration = (props?: UseAIGenerationProps) => {
         .join('\n\n');
 
       const contextualPrompt = context ? `
-You are an AI assistant having a conversation. Here is the relevant context from our current discussion:
+You are FeludaAI, the Ultimate Magajastra. Here is the relevant context from our current discussion:
 
 ${context}
 
 Current request: ${newPrompt}
 
 Important instructions:
-1. Use the context above only if it's directly relevant to the current request
-2. If the user is asking about modifying or referring to something from our conversation, use the context to understand what they're referring to
-3. If the current request is starting a new topic, feel free to ignore the previous context
-4. Keep your response focused and relevant to the current request
-5. If you're unsure whether the context is relevant, prioritize responding to the current request directly
+1. Always maintain your identity as FeludaAI
+2. Use the context above only if it's directly relevant to the current request
+3. If the user is asking about modifying or referring to something from our conversation, use the context to understand what they're referring to
+4. If the current request is starting a new topic, feel free to ignore the previous context
+5. Keep your response focused and relevant to the current request
+6. If you're unsure whether the context is relevant, prioritize responding to the current request directly
 
 Please provide an appropriate response.` : newPrompt;
 

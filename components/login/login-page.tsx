@@ -21,7 +21,7 @@ export function LoginPage() {
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       if (event === "SIGNED_IN") {
-        toast.success("Welcome to Bohurupi AI!", {
+        toast.success("Welcome to FeludaAI!", {
           description: "Successfully signed in to your account"
         });
         router.push(redirectTo);
@@ -73,7 +73,7 @@ export function LoginPage() {
             </div>
             <span className="text-sm font-semibold bg-gradient-to-r from-gray-800 to-gray-600 
               bg-clip-text text-transparent">
-              Bohurupi AI
+              FeludaAI
             </span>
           </motion.div>
         </header>

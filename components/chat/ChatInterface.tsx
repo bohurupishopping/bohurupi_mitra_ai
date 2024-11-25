@@ -223,7 +223,20 @@ function ChatInterface({ defaultMessage, sessionId, onModelChange }: ChatInterfa
 
   const [messages, setMessages] = useState<ChatMessage[]>([{
     role: 'assistant',
-    content: defaultMessage || "# Hello! 👋\n\nI'm your AI assistant. How can I help you today?"
+    content: `# নমস্কার! 🙏
+
+আমি ফেলুদা এ.আই। জ্ঞান আর মগজাস্ত্র নিয়ে তোমার কাছে এসেছি, লালমোহন বাবুর মতো গল্প বলার ক্ষমতা আমার নেই, কিন্তু টেলিপ‍্যাথির জোর আছে! কি খুঁজতে এসেছো আজ?
+
+Here's how I can assist you:
+
+- 🔍 **Problem Solving** - Using my Magajastra
+- 📚 **Knowledge Sharing** - Across diverse domains
+- 💡 **Creative Assistance** - For various tasks
+- 🤝 **Thoughtful Discussions** - On any topic
+
+Feel free to ask me anything - জটিল কেস থেকে সাধারণ প্রশ্ন, সবই চলবে!
+
+*"কোনো প্রশ্ন আছে?" - Do you have any questions?* 🕵️‍♂️`
   }]);
   const [prompt, setPrompt] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -477,8 +490,8 @@ function ChatInterface({ defaultMessage, sessionId, onModelChange }: ChatInterfa
             <Avatar className="w-6 h-6 sm:w-10 sm:h-10">
               <AvatarImage src="/assets/ai.png" alt="AI Avatar" />
             </Avatar>
-            <span className="font-medium text-xs sm:text-base hidden sm:inline">Bohurupi AI : Your Personalized AI Assistant</span>
-            <span className="font-medium text-xs sm:hidden">Bohurupi AI</span>
+            <span className="font-medium text-xs sm:text-base hidden sm:inline">FeludaAI : Your Ultimate Magajastra</span>
+            <span className="font-medium text-xs sm:hidden">FeludaAI</span>
           </div>
           <div className="flex items-center space-x-1 sm:space-x-2">
             <TooltipProvider>
@@ -495,7 +508,20 @@ function ChatInterface({ defaultMessage, sessionId, onModelChange }: ChatInterfa
                           // Clear messages from UI
                           setMessages([{
                             role: 'assistant',
-                            content: "# Hello! 👋\n\nI'm your AI assistant. How can I help you today?"
+                            content: `# নমস্কার! 🙏
+
+আমি ফেলুদা এ.আই। জ্ঞান আর মগজাস্ত্র নিয়ে তোমার কাছে এসেছি, লালমোহন বাবুর মতো গল্প বলার ক্ষমতা আমার নেই, কিন্তু টেলিপ‍্যাথির জোর আছে! কি খুঁজতে এসেছো আজ?
+
+Here's how I can assist you:
+
+- 🔍 **Problem Solving** - Using my Magajastra
+- 📚 **Knowledge Sharing** - Across diverse domains
+- 💡 **Creative Assistance** - For various tasks
+- 🤝 **Thoughtful Discussions** - On any topic
+
+Feel free to ask me anything - জটিল কেস থেকে সাধারণ প্রশ্ন, সবই চলবে!
+
+*"কোনো প্রশ্ন আছে?" - Do you have any questions?* 🕵️‍♂️`
                           }]);
 
                           // If we have a sessionId, only delete that specific session

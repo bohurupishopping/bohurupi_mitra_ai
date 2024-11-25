@@ -294,7 +294,7 @@ export default function Sidebar({ isOpen, onToggle }: SidebarProps) {
                   className="text-lg font-semibold bg-gradient-to-r from-blue-600 to-purple-600 
                     bg-clip-text text-transparent"
                 >
-                  Bohurupi AI
+                  FeludaAI
                 </motion.h1>
               )}
             </AnimatePresence>

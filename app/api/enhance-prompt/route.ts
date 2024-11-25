@@ -2,13 +2,9 @@ import { NextResponse } from 'next/server';
 import OpenAI from 'openai';
 import { imageStyles } from '@/components/imagine/ImageTypeSelector';
 
-const openRouterClient = new OpenAI({
-  baseURL: "https://openrouter.ai/api/v1",
-  apiKey: process.env.OPEN_ROUTER_API_KEY || '',
-  defaultHeaders: {
-    "HTTP-Referer": process.env.NEXT_PUBLIC_APP_URL,
-    "X-Title": "FeludaAI",
-  }
+const client = new OpenAI({
+  apiKey: process.env.GROQ_API_KEY,
+  baseURL: 'https://api.groq.com/openai/v1',
 });
 
 const getStyleSpecificSystemPrompt = (styleType: string, size: string) => {
@@ -102,7 +98,7 @@ export async function POST(request: Request) {
 
     const systemPrompt = getStyleSpecificSystemPrompt(styleType, size);
 
-    const completion = await openRouterClient.chat.completions.create({
+    const completion = await client.chat.completions.create({
       model: 'llama-3.2-11b-vision-preview',
       messages: [
         {

@@ -741,23 +741,32 @@ Feel free to ask me anything - জটিল কেস থেকে সাধা�
             <div ref={messagesEndRef} className="scroll-mt-[100px]" />
           </div>
 
-          <div className="border-t bg-transparent p-2 sm:p-4">
+          <div className="border-t border-white/10 bg-transparent p-2 sm:p-4">
             <div className="max-w-2xl mx-auto">
               <form onSubmit={handleSubmit} className="space-y-4">
                 <div className="relative group">
-                  <div className="absolute -inset-1 bg-gradient-to-r from-purple-500/20 to-blue-500/20 
-                    dark:from-purple-400/30 dark:to-blue-400/30
-                    rounded-[2rem] blur opacity-75 group-hover:opacity-100 
-                    motion-safe:transition-opacity motion-safe:duration-300">
+                  <div className="absolute -inset-1 bg-gradient-to-r from-blue-500/10 via-purple-500/10 to-pink-500/10 
+                    dark:from-blue-400/20 dark:via-purple-400/20 dark:to-pink-400/20
+                    rounded-[1.75rem] blur-xl opacity-70 group-hover:opacity-100 
+                    motion-safe:transition-all motion-safe:duration-500">
                   </div>
-                  <div className="relative rounded-[2.5rem] overflow-hidden 
-                    bg-white/20 dark:bg-gray-900/20 backdrop-blur-xl 
+                  <div className="relative rounded-[1.75rem] overflow-hidden 
+                    bg-white/10 dark:bg-gray-900/10 backdrop-blur-xl 
                     border border-white/20 dark:border-white/10 
-                    shadow-lg group-hover:shadow-xl 
+                    shadow-lg hover:shadow-xl 
                     motion-safe:transition-all motion-safe:duration-300">
                     
+                    <div className="absolute top-3 left-1/2 transform -translate-x-1/2 z-10">
+                      <ModelSelector 
+                        onModelChange={handleModelChange}
+                        compact={true}
+                        isChatMode={true}
+                      />
+                    </div>
+
                     {attachments.length > 0 && (
-                      <div className="flex flex-wrap gap-2 p-2 border-b border-gray-200/30">
+                      <div className="flex flex-wrap gap-2 p-3 border-b border-white/10
+                        bg-white/5 dark:bg-gray-900/5 backdrop-blur-sm">
                         {attachments.map((attachment) => (
                           <div key={attachment.id} className="relative group/attachment">
                             {attachment.type === 'image' && attachment.preview && (
@@ -804,11 +813,12 @@ Feel free to ask me anything - জটিল কেস থেকে সাধা�
                         }
                       }}
                       placeholder="Type a message..."
-                      className="w-full min-h-[60px] max-h-[200px] px-6 py-4 text-base
+                      className="w-full min-h-[60px] max-h-[200px] px-6 py-4 pt-[4.5rem]
                         bg-transparent border-none focus:outline-none focus:ring-0
-                        placeholder:text-gray-400 resize-none selection:bg-blue-200/30
+                        placeholder:text-gray-400/70 resize-none selection:bg-blue-200/30
                         [&:not(:focus)]:border-none [&:not(:focus)]:ring-0
-                        focus-visible:ring-0 focus-visible:ring-offset-0"
+                        focus-visible:ring-0 focus-visible:ring-offset-0
+                        text-gray-700 dark:text-gray-200"
                       style={{ 
                         height: 'auto',
                         overflowY: 'auto',
@@ -816,60 +826,61 @@ Feel free to ask me anything - জটিল কেস থেকে সাধা�
                       }}
                     />
                     
-                    <div className="flex items-center justify-between p-2 sm:p-3 
-                      border-t border-white/10 bg-white/5">
-                      <div className="flex items-center gap-2">
+                    <div className="flex items-center justify-center p-2 sm:p-3 
+                      border-t border-white/10 bg-gradient-to-b from-transparent to-white/5 
+                      dark:to-gray-900/5 backdrop-blur-sm">
+                      <div className="flex items-center justify-center gap-3">
                         <Button
                           type="button"
                           variant="ghost"
                           size="sm"
                           onClick={() => fileInputRef.current?.click()}
-                          className="rounded-xl hover:bg-white/10 transition-all duration-300
-                            flex items-center gap-2 text-sm group/attach"
+                          className="rounded-xl bg-white/10 hover:bg-white/20 
+                            dark:bg-gray-900/20 dark:hover:bg-gray-900/30
+                            transition-all duration-300 backdrop-blur-sm
+                            flex items-center gap-2 text-sm group/attach
+                            border border-white/10 dark:border-white/5
+                            shadow-sm hover:shadow-md"
                         >
                           <ImageIcon className="w-4 h-4 group-hover/attach:scale-110 
                             transition-transform duration-300" />
                           <span className="hidden sm:inline">Attach</span>
                         </Button>
 
-                        <ModelSelector 
-                          onModelChange={handleModelChange}
-                          compact={true}
-                          isChatMode={true}
-                        />
-
-                        <input
-                          type="file"
-                          ref={fileInputRef}
-                          onChange={handleFileSelect}
-                          className="hidden"
-                          multiple
-                          accept="image/*,.pdf,.doc,.docx,.txt"
-                        />
+                        <Button 
+                          type="submit"
+                          disabled={!prompt.trim() && attachments.length === 0 || isLoading}
+                          className="rounded-xl bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500
+                            hover:from-blue-600 hover:via-purple-600 hover:to-pink-600 
+                            disabled:from-gray-400 disabled:to-gray-500
+                            text-white font-medium
+                            shadow-lg hover:shadow-xl transition-all duration-300
+                            transform hover:-translate-y-0.5 hover:scale-[1.02]
+                            px-4 sm:px-6 py-2 text-sm
+                            border border-white/10 backdrop-blur-sm"
+                        >
+                          <div className="flex items-center gap-2">
+                            {isLoading ? (
+                              <RefreshCw className="w-4 h-4 animate-spin" />
+                            ) : (
+                              <Send className="w-4 h-4" />
+                            )}
+                            <span className="text-xs sm:text-sm">
+                              {isLoading ? "Sending..." : "Send"}
+                            </span>
+                          </div>
+                        </Button>
                       </div>
-
-                      <Button 
-                        type="submit"
-                        disabled={!prompt.trim() && attachments.length === 0 || isLoading}
-                        className="rounded-xl bg-gradient-to-r from-purple-500 to-blue-500
-                          hover:from-purple-600 hover:to-blue-600 text-white
-                          shadow-lg hover:shadow-xl transition-all duration-300
-                          transform hover:-translate-y-0.5 hover:scale-105
-                          px-3 sm:px-5 py-2 text-sm font-medium
-                          mr-2 sm:mr-3"
-                      >
-                        <div className="flex items-center gap-2">
-                          {isLoading ? (
-                            <RefreshCw className="w-4 h-4 animate-spin" />
-                          ) : (
-                            <Send className="w-4 h-4" />
-                          )}
-                          <span className="text-xs sm:text-sm">
-                            {isLoading ? "Sending..." : "Send"}
-                          </span>
-                        </div>
-                      </Button>
                     </div>
+
+                    <input
+                      type="file"
+                      ref={fileInputRef}
+                      onChange={handleFileSelect}
+                      className="hidden"
+                      multiple
+                      accept="image/*,.pdf,.doc,.docx,.txt"
+                    />
                   </div>
                 </div>
               </form>

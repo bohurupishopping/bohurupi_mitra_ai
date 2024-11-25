@@ -22,7 +22,8 @@ import {
   Sparkles,
   Globe2,
   Zap,
-  Radio
+  Radio,
+  FileText
 } from 'lucide-react';
 import { useToast } from "@/components/ui/use-toast";
 import {
@@ -187,6 +188,13 @@ export default function Sidebar({ isOpen, onToggle }: SidebarProps) {
       href: '/imagine', 
       color: 'text-indigo-400',
       description: 'AI Image Generation'
+    },
+    { 
+      icon: FileText, 
+      label: 'Document AI', 
+      href: '/document', 
+      color: 'text-emerald-400',
+      description: 'Document Analysis & Chat'
     },
     { 
       icon: Globe2, 

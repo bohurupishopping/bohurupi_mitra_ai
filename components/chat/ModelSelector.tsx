@@ -1,6 +1,6 @@
 "use client";
 
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { Sparkles, Bot, Cpu, Brain, Zap, Star, Lightbulb, Atom, Wand2, Rocket, Cloud, FlaskConical } from 'lucide-react';
 import {
   Select,
@@ -18,7 +18,34 @@ interface ModelSelectorProps {
   isChatMode?: boolean;
 }
 
-const MODEL_CONFIGS = [
+interface GeminiModel {
+  id: string;
+  name: string;
+  description: string;
+  inputTokenLimit: number;
+  outputTokenLimit: number;
+  provider: string;
+  temperature: number;
+  topP: number;
+}
+
+interface GroqModel {
+  id: string;
+  name: string;
+  maxTokens: number;
+  provider: string;
+}
+
+interface ModelConfig {
+  provider: string;
+  value: string;
+  label: string;
+  icon: React.ElementType;
+  color: string;
+  bgColor: string;
+}
+
+const STATIC_MODEL_CONFIGS: ModelConfig[] = [
   { 
     provider: 'Groq',
     value: 'groq',
@@ -26,22 +53,6 @@ const MODEL_CONFIGS = [
     icon: Zap,
     color: 'text-yellow-500',
     bgColor: 'bg-yellow-50',
-  },
-  { 
-    provider: 'Google',
-    value: 'gemini-1.5-pro',
-    label: 'Gemini 1.5 Pro',
-    icon: Lightbulb,
-    color: 'text-red-500',
-    bgColor: 'bg-red-50',
-  },
-  { 
-    provider: 'Google',
-    value: 'gemini-1.5-flash',
-    label: 'Gemini 1.5 Flash',
-    icon: Wand2,
-    color: 'text-red-400',
-    bgColor: 'bg-red-50',
   },
   { 
     provider: 'Mistral',
@@ -86,9 +97,68 @@ const MODEL_CONFIGS = [
 ];
 
 export function ModelSelector({ onModelChange, compact, isChatMode }: ModelSelectorProps) {
-  React.useEffect(() => {
-    onModelChange('groq');
+  const [geminiModels, setGeminiModels] = useState<GeminiModel[]>([]);
+  const [groqModels, setGroqModels] = useState<GroqModel[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const fetchModels = async () => {
+      try {
+        const [geminiResponse, groqResponse] = await Promise.all([
+          fetch('/api/models/gemini'),
+          fetch('/api/models/groq')
+        ]);
+
+        if (!geminiResponse.ok) throw new Error('Failed to fetch Gemini models');
+        if (!groqResponse.ok) throw new Error('Failed to fetch Groq models');
+        
+        const geminiData = await geminiResponse.json();
+        const groqData = await groqResponse.json();
+
+        setGeminiModels(geminiData.models);
+        setGroqModels(groqData.models);
+      } catch (err) {
+        console.error('Error fetching models:', err);
+        setError(err instanceof Error ? err.message : 'Failed to fetch models');
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchModels();
   }, []);
+
+  // Combine all models into MODEL_CONFIGS
+  const allModelConfigs: ModelConfig[] = [
+    // Add Groq models
+    ...groqModels.map(model => ({
+      provider: 'Groq',
+      value: model.id,
+      label: model.name.split('Llama ')[1], // Only show version number
+      icon: Brain,
+      color: 'text-yellow-500',
+      bgColor: 'bg-yellow-50',
+    })),
+    // Add Gemini models
+    ...geminiModels.map(model => ({
+      provider: 'Google',
+      value: model.id,
+      label: model.name.split('Gemini ')[1], // Only show version number
+      icon: model.id.includes('pro') ? Lightbulb : Wand2,
+      color: 'text-red-500',
+      bgColor: 'bg-red-50',
+    })),
+    // Add other static models (excluding Groq)
+    ...STATIC_MODEL_CONFIGS.filter(model => model.provider !== 'Groq')
+  ];
+
+  // Set default model
+  React.useEffect(() => {
+    if (!isLoading && allModelConfigs.length > 0) {
+      onModelChange(allModelConfigs[0].value);
+    }
+  }, [isLoading]);
 
   const IconComponent = ({ icon: Icon, color, bgColor }: { 
     icon: React.ElementType,
@@ -99,6 +169,34 @@ export function ModelSelector({ onModelChange, compact, isChatMode }: ModelSelec
       <Icon className={`h-3 w-3 ${color}`} />
     </div>
   );
+
+  if (isLoading) {
+    return (
+      <div className="animate-pulse">
+        <div className={`${compact ? 'w-[160px]' : 'w-[180px]'} h-9 bg-gray-200 rounded-xl`} />
+      </div>
+    );
+  }
+
+  if (error) {
+    console.error('Model loading error:', error);
+    return (
+      <Select onValueChange={onModelChange}>
+        <SelectTrigger className={`${compact ? 'w-[160px]' : 'w-[180px]'} h-9`}>
+          <SelectValue placeholder="Select Model" />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectGroup>
+            {STATIC_MODEL_CONFIGS.map((model) => (
+              <SelectItem key={model.value} value={model.value}>
+                {model.provider} {model.label}
+              </SelectItem>
+            ))}
+          </SelectGroup>
+        </SelectContent>
+      </Select>
+    );
+  }
 
   return (
     <Select onValueChange={onModelChange}>
@@ -121,7 +219,7 @@ export function ModelSelector({ onModelChange, compact, isChatMode }: ModelSelec
           animate-in fade-in-0 zoom-in-95"
       >
         <SelectGroup className="px-0.5">
-          {MODEL_CONFIGS.map((model) => (
+          {allModelConfigs.map((model) => (
             <SelectItem 
               key={model.value} 
               value={model.value}
@@ -144,11 +242,9 @@ export function ModelSelector({ onModelChange, compact, isChatMode }: ModelSelec
                   color={model.color} 
                   bgColor={`${model.bgColor} bg-opacity-60`} 
                 />
-                <div className="flex flex-col">
-                  <span className="text-[13px] font-medium text-gray-700 truncate">
-                    {model.provider} {model.label}
-                  </span>
-                </div>
+                <span className="text-[13px] font-medium text-gray-700 truncate">
+                  {model.provider} {model.label}
+                </span>
               </motion.div>
             </SelectItem>
           ))}

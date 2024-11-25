@@ -42,6 +42,8 @@ export async function POST(req: Request) {
   try {
     const { model, prompt, options } = await req.json();
 
+    let result;
+
     // Handle Hermes model streaming first
     if (model === 'nousresearch/hermes-3-llama-3.1-405b:free') {
       const stream = await openRouterClient.chat.completions.create({
@@ -96,64 +98,32 @@ export async function POST(req: Request) {
         },
       });
     }
-
-    // Handle other models as before...
-    let result;
-
-    // Handle Google AI models with streaming for Gemini 1.5 Pro
-    if (model.startsWith('gemini-')) {
+    // Handle Google AI models with streaming for Gemini models
+    else if (model.startsWith('gemini-')) {
       const modelName = model;
       const googleModel = googleAI.getGenerativeModel({ model: modelName });
       
       try {
-        if (model === 'gemini-1.5-pro') {
-          // Use streaming for Gemini Pro
-          const response = await googleModel.generateContentStream({
-            contents: [{ role: 'user', parts: [{ text: prompt }] }],
-            generationConfig: {
-              maxOutputTokens: 1000000,
-              temperature: options?.temperature || 0.7,
-              topP: options?.topP || 0.4
-            }
-          });
-
-          let fullText = '';
-          
-          for await (const chunk of response.stream) {
-            const chunkText = chunk.text();
-            fullText += chunkText;
+        // Use streaming for both Pro and Flash models
+        const response = await googleModel.generateContentStream({
+          contents: [{ role: 'user', parts: [{ text: prompt }] }],
+          generationConfig: {
+            maxOutputTokens: model === 'gemini-1.5-pro' ? 1000000 : 
+                            model === 'gemini-1.5-flash' ? 128000 : 
+                            8192,
+            temperature: options?.temperature || 1,
+            topP: options?.topP || 0.95
           }
-          
-          result = fullText;
-        } 
-        else if (model === 'gemini-1.5-flash') {
-          // Handle Flash model with standard generation
-          const response = await googleModel.generateContent({
-            contents: [{ role: 'user', parts: [{ text: prompt }] }],
-            generationConfig: {
-              maxOutputTokens: 128000,
-              temperature: options?.temperature || 0.7,
-              topP: options?.topP || 0.4
-            }
-          });
+        });
 
-          if (!response.response) {
-            throw new Error('Empty response from Gemini Flash model');
-          }
-          result = response.response.text();
+        let fullText = '';
+        
+        for await (const chunk of response.stream) {
+          const chunkText = chunk.text();
+          fullText += chunkText;
         }
-        else {
-          // Handle other Gemini models
-          const response = await googleModel.generateContent({
-            contents: [{ role: 'user', parts: [{ text: prompt }] }],
-            generationConfig: {
-              maxOutputTokens: 1000000,
-              temperature: options?.temperature || 0.7,
-              topP: options?.topP || 0.4
-            }
-          });
-          result = response.response.text();
-        }
+        
+        result = fullText;
       } catch (error: any) {
         console.error('Gemini API error:', error);
         throw new Error(`Gemini API error: ${error.message || 'Unknown error'}`);
@@ -173,7 +143,7 @@ export async function POST(req: Request) {
       result = response.choices[0]?.message?.content;
     } 
     // Handle OpenRouter models
-    else if (model.includes('/')) {
+    else if (model.includes('/') && !model.startsWith('llama-')) {
       const response = await openRouterClient.chat.completions.create({
         model: model,
         messages: [{ role: 'user', content: prompt }],
@@ -185,6 +155,21 @@ export async function POST(req: Request) {
 
       result = response.choices[0]?.message?.content;
     }
+    // Handle Groq models
+    else if (model.startsWith('llama-') || model === 'groq') {
+      const modelId = model === 'groq' ? 'llama-3.2-90b-vision-preview' : model;
+      const modelInstance = groqClient(modelId);
+
+      const response = await generateText({
+        model: modelInstance,
+        messages: [{ role: 'user', content: prompt }],
+        maxTokens: options?.maxTokens || 8192,
+        temperature: options?.temperature || 0.7,
+        topP: options?.topP || 0.4,
+      });
+
+      result = response.text;
+    }
     // Handle other models
     else {
       let modelInstance;
@@ -194,18 +179,6 @@ export async function POST(req: Request) {
           break;
         case 'pixtral-large-latest':
           modelInstance = mistralClient('pixtral-large-latest');
-          // Use generateText with increased tokens for Pixtral
-          const response = await generateText({
-            model: modelInstance,
-            messages: [{ role: 'user', content: prompt }],
-            maxTokens: 128000,
-            temperature: options?.temperature || 0.7,
-            topP: options?.topP || 0.4,
-          });
-          result = response.text;
-          break;
-        case 'groq':
-          modelInstance = groqClient('llama-3.2-90b-vision-preview');
           break;
         case 'xai':
           modelInstance = xai('grok-beta');

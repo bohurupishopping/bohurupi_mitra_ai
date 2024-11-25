@@ -14,6 +14,12 @@ const getMaxTokens = (model: string) => {
   if (model === 'gemini-1.5-flash') {
     return 128000;
   }
+  if (model.includes('llama-3.2-90b')) {
+    return 8192;
+  }
+  if (model.includes('llama-3.2-11b')) {
+    return 8192;
+  }
   if (model === 'pixtral-large-latest') {
     return 128000;
   }
@@ -34,12 +40,18 @@ export const useAIGeneration = (props?: UseAIGenerationProps) => {
   const [paragraphs, setParagraphs] = useState<string[]>([]);
 
   const getModelDisplayName = (modelId: string) => {
+    if (modelId.startsWith('llama-')) {
+      return modelId
+        .replace('llama-', 'Llama ')
+        .replace('-vision-preview', ' Vision')
+        .replace('-versatile', ' Versatile');
+    }
+    if (modelId.startsWith('gemini-')) {
+      return `Gemini ${modelId.split('gemini-')[1]}`;
+    }
     const modelMap: { [key: string]: string } = {
-      'gemini-1.5-pro': 'Gemini 1.5 Pro',
-      'gemini-1.5-flash': 'Gemini 1.5 Flash',
-      'groq': 'Llama 3.2 90B Vision',
       'open-mistral-nemo': 'Open Mistral Nemo',
-      'mistral-large': 'Mistral Large',
+      'pixtral-large-latest': 'Pixtral Large',
       'xai': 'Grok',
       'nousresearch/hermes-3-llama-3.1-405b:free': 'Hermes 3 405B',
       'meta-llama/llama-3.1-70b-instruct:free': 'Llama 3.1 70B'
@@ -98,13 +110,45 @@ Please provide an appropriate response.` : newPrompt;
       const contextualPrompt = await buildContextualPrompt(prompt);
       const modelToUse = selectedModel;
       
-      // Handle streaming for Hermes model
-      if (modelToUse === 'nousresearch/hermes-3-llama-3.1-405b:free') {
+      // For Gemini models
+      if (modelToUse.startsWith('gemini-')) {
         const response = await fetch('/api/generate', {
           method: 'POST',
-          headers: { 
+          headers: {
             'Content-Type': 'application/json',
-            'Accept': 'text/event-stream',
+          },
+          body: JSON.stringify({
+            model: modelToUse,
+            prompt: contextualPrompt,
+            options: {
+              maxTokens: getMaxTokens(modelToUse),
+              temperature: 1,
+              topP: 0.95
+            }
+          }),
+        });
+
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.error || 'Failed to generate content');
+        }
+
+        const data = await response.json();
+        
+        if (!data.result) {
+          throw new Error('No content generated');
+        }
+
+        await conversationService.saveConversation(prompt, data.result);
+        setGeneratedContent(data.result);
+        return data.result;
+      }
+      // For Groq models
+      else if (modelToUse.startsWith('llama-') || modelToUse === 'groq') {
+        const response = await fetch('/api/generate', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
           },
           body: JSON.stringify({
             model: modelToUse,
@@ -114,63 +158,33 @@ Please provide an appropriate response.` : newPrompt;
               temperature: 0.7,
               topP: 0.4
             }
-          })
+          }),
         });
 
         if (!response.ok) {
           const errorData = await response.json();
-          throw new Error(errorData.error || 'Stream generation failed');
+          throw new Error(errorData.error || 'Failed to generate content');
         }
+
+        const data = await response.json();
         
-        if (!response.body) throw new Error('No response body available');
-        
-        const reader = response.body.getReader();
-        const decoder = new TextDecoder();
-        
-        let accumulatedText = '';
-        let buffer = '';
-        
-        try {
-          while (true) {
-            const { done, value } = await reader.read();
-            if (done) break;
-            
-            const chunk = decoder.decode(value);
-            buffer += chunk;
-            
-            // Process complete SSE messages
-            const lines = buffer.split('\n');
-            buffer = lines.pop() || ''; // Keep incomplete line in buffer
-            
-            for (const line of lines) {
-              if (line.startsWith('data: ')) {
-                try {
-                  const data = JSON.parse(line.slice(6));
-                  accumulatedText = data.accumulated;
-                  const newParagraphs = processStreamedText(accumulatedText);
-                  setParagraphs(newParagraphs);
-                  setStreamedContent(accumulatedText);
-                  
-                  if (data.done) {
-                    await conversationService.saveConversation(prompt, accumulatedText);
-                    setGeneratedContent(accumulatedText);
-                    return accumulatedText;
-                  }
-                } catch (e) {
-                  console.error('Error parsing streaming data:', e);
-                }
-              }
-            }
+        if (data.result) {
+          let finalResponse = data.result;
+
+          // Check for truncated response
+          if (finalResponse.endsWith('...') || finalResponse.endsWith('…')) {
+            console.warn('Response appears to be truncated, consider increasing context window');
           }
-        } catch (error) {
-          console.error('Streaming error:', error);
-          throw error;
-        } finally {
-          reader.releaseLock();
+
+          await conversationService.saveConversation(prompt, finalResponse);
+          setGeneratedContent(finalResponse);
+          return finalResponse;
         }
+
+        throw new Error('No content generated');
       }
       
-      // For non-streaming models
+      // For other models
       const isModelQuery = prompt.toLowerCase().includes('which model') || 
                           prompt.toLowerCase().includes('what model') ||
                           prompt.toLowerCase().includes('who are you');

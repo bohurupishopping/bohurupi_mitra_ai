@@ -406,130 +406,25 @@ function ChatInterface({ defaultMessage, sessionId, onModelChange }: ChatInterfa
     e.preventDefault();
     if ((!prompt.trim() && attachments.length === 0) || isLoading) return;
 
-    const attachmentUrls = attachments
-      .filter(att => att.url)
-      .map(att => att.url as string);
-
-    const userMessage: Message = {
+    setMessages(prev => [...prev, {
       role: 'user',
       content: prompt,
-      attachments: attachmentUrls
-    };
-
-    setMessages(prev => [...prev, userMessage]);
+      attachments: attachments
+        .filter(att => att.url)
+        .map(att => att.url as string)
+    }]);
     setPrompt('');
     setIsLoading(true);
     setIsTyping(true);
 
     try {
-      // For streaming models (Hermes)
-      if (selectedModel === 'nousresearch/hermes-3-llama-3.1-405b:free') {
-        const response = await fetch('/api/generate', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            model: selectedModel,
-            prompt: prompt,
-            options: {
-              maxTokens: 8192,
-              temperature: 0.7,
-              topP: 0.4
-            }
-          })
-        });
-
-        if (!response.ok) throw new Error('Failed to generate response');
-
-        const reader = response.body?.getReader();
-        if (!reader) throw new Error('No reader available');
-
-        // Add initial assistant message
+      const response = await generateContent(prompt);
+      
+      if (response) {
         setMessages(prev => [...prev, {
           role: 'assistant',
-          content: ''
+          content: response
         }]);
-
-        const decoder = new TextDecoder();
-        let accumulatedContent = '';
-
-        while (true) {
-          const { done, value } = await reader.read();
-          if (done) break;
-
-          const chunk = decoder.decode(value);
-          const lines = chunk.split('\n');
-
-          for (const line of lines) {
-            if (line.startsWith('data: ')) {
-              try {
-                const data = JSON.parse(line.slice(5));
-                accumulatedContent = data.accumulated;
-
-                // Update the last message with accumulated content
-                setMessages(prev => [
-                  ...prev.slice(0, -1),
-                  {
-                    role: 'assistant',
-                    content: accumulatedContent
-                  }
-                ]);
-
-                if (data.done) {
-                  await conversationService.saveConversation(prompt, accumulatedContent);
-                  window.dispatchEvent(new CustomEvent('chat-updated'));
-                  break;
-                }
-              } catch (e) {
-                console.error('Error parsing SSE data:', e);
-              }
-            }
-          }
-        }
-      } else {
-        // For non-streaming models
-        const response = await fetch('/api/generate', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            model: selectedModel,
-            prompt: prompt,
-            options: {
-              maxTokens: getMaxTokens(selectedModel),
-              temperature: 0.7,
-              topP: 0.4
-            }
-          })
-        });
-
-        if (!response.ok) {
-          throw new Error('Failed to generate response');
-        }
-
-        const data = await response.json();
-        
-        if (data.error) {
-          throw new Error(data.error);
-        }
-
-        // Add initial assistant message
-        setMessages(prev => [...prev, {
-          role: 'assistant',
-          content: ''
-        }]);
-
-        // Use typeText for smooth rendering
-        await typeText(data.result, (partial) => {
-          setMessages(prev => [
-            ...prev.slice(0, -1),
-            {
-              role: 'assistant',
-              content: partial
-            }
-          ]);
-        });
-
-        await conversationService.saveConversation(prompt, data.result);
-        window.dispatchEvent(new CustomEvent('chat-updated'));
       }
     } catch (error) {
       console.error('Error generating response:', error);

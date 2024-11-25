@@ -12,7 +12,7 @@ const getMaxTokens = (model: string) => {
     return 1000000;
   }
   if (model === 'gemini-1.5-flash') {
-    return 128000;
+    return 8192;
   }
   if (model.includes('llama-3.2-90b')) {
     return 8192;

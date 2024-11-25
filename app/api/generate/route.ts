@@ -109,7 +109,7 @@ export async function POST(req: Request) {
           contents: [{ role: 'user', parts: [{ text: prompt }] }],
           generationConfig: {
             maxOutputTokens: model === 'gemini-1.5-pro' ? 1000000 : 
-                            model === 'gemini-1.5-flash' ? 128000 : 
+                            model === 'gemini-1.5-flash' ? 8192 : 
                             8192,
             temperature: options?.temperature || 1,
             topP: options?.topP || 0.95

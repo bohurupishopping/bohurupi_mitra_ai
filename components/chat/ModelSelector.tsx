@@ -7,8 +7,10 @@ import {
   SelectContent,
   SelectGroup,
   SelectItem,
+  SelectLabel,
   SelectTrigger,
   SelectValue,
+  SelectSeparator,
 } from "@/components/ui/select";
 import { motion } from "framer-motion";
 
@@ -36,6 +38,18 @@ interface GroqModel {
   provider: string;
 }
 
+interface OpenRouterModel {
+  id: string;
+  name: string;
+  maxTokens: number;
+  provider: string;
+  contextWindow?: number;
+  pricing?: {
+    prompt: number;
+    completion: number;
+  };
+}
+
 interface ModelConfig {
   provider: string;
   value: string;
@@ -43,6 +57,14 @@ interface ModelConfig {
   icon: React.ElementType;
   color: string;
   bgColor: string;
+}
+
+interface ProviderConfig {
+  name: string;
+  icon: React.ElementType;
+  color: string;
+  bgColor: string;
+  models: ModelConfig[];
 }
 
 const STATIC_MODEL_CONFIGS: ModelConfig[] = [
@@ -99,25 +121,31 @@ const STATIC_MODEL_CONFIGS: ModelConfig[] = [
 export function ModelSelector({ onModelChange, compact, isChatMode }: ModelSelectorProps) {
   const [geminiModels, setGeminiModels] = useState<GeminiModel[]>([]);
   const [groqModels, setGroqModels] = useState<GroqModel[]>([]);
+  const [openRouterModels, setOpenRouterModels] = useState<OpenRouterModel[]>([]);
+  const [selectedProvider, setSelectedProvider] = useState<string>('');
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     const fetchModels = async () => {
       try {
-        const [geminiResponse, groqResponse] = await Promise.all([
+        const [geminiResponse, groqResponse, openRouterResponse] = await Promise.all([
           fetch('/api/models/gemini'),
-          fetch('/api/models/groq')
+          fetch('/api/models/groq'),
+          fetch('/api/models/openrouter')
         ]);
 
         if (!geminiResponse.ok) throw new Error('Failed to fetch Gemini models');
         if (!groqResponse.ok) throw new Error('Failed to fetch Groq models');
+        if (!openRouterResponse.ok) throw new Error('Failed to fetch OpenRouter models');
         
         const geminiData = await geminiResponse.json();
         const groqData = await groqResponse.json();
+        const openRouterData = await openRouterResponse.json();
 
         setGeminiModels(geminiData.models);
         setGroqModels(groqData.models);
+        setOpenRouterModels(openRouterData.models);
       } catch (err) {
         console.error('Error fetching models:', err);
         setError(err instanceof Error ? err.message : 'Failed to fetch models');
@@ -129,36 +157,83 @@ export function ModelSelector({ onModelChange, compact, isChatMode }: ModelSelec
     fetchModels();
   }, []);
 
-  // Combine all models into MODEL_CONFIGS
-  const allModelConfigs: ModelConfig[] = [
-    // Add Groq models
-    ...groqModels.map(model => ({
-      provider: 'Groq',
-      value: model.id,
-      label: model.name.split('Llama ')[1], // Only show version number
+  // Group models by provider
+  const providerConfigs: ProviderConfig[] = React.useMemo(() => [
+    {
+      name: 'Groq',
       icon: Brain,
       color: 'text-yellow-500',
       bgColor: 'bg-yellow-50',
-    })),
-    // Add Gemini models
-    ...geminiModels.map(model => ({
-      provider: 'Google',
-      value: model.id,
-      label: model.name.split('Gemini ')[1], // Only show version number
-      icon: model.id.includes('pro') ? Lightbulb : Wand2,
+      models: groqModels.map(model => ({
+        provider: 'Groq',
+        value: model.id,
+        label: model.name.split('Llama ')[1],
+        icon: Brain,
+        color: 'text-yellow-500',
+        bgColor: 'bg-yellow-50',
+      }))
+    },
+    {
+      name: 'Google',
+      icon: Lightbulb,
       color: 'text-red-500',
       bgColor: 'bg-red-50',
-    })),
-    // Add other static models (excluding Groq)
-    ...STATIC_MODEL_CONFIGS.filter(model => model.provider !== 'Groq')
-  ];
-
-  // Set default model
-  React.useEffect(() => {
-    if (!isLoading && allModelConfigs.length > 0) {
-      onModelChange(allModelConfigs[0].value);
+      models: geminiModels.map(model => ({
+        provider: 'Google',
+        value: model.id,
+        label: model.name.split('Gemini ')[1],
+        icon: model.id.includes('pro') ? Lightbulb : Wand2,
+        color: 'text-red-500',
+        bgColor: 'bg-red-50',
+      }))
+    },
+    {
+      name: 'Mistral',
+      icon: Cpu,
+      color: 'text-blue-500',
+      bgColor: 'bg-blue-50',
+      models: STATIC_MODEL_CONFIGS.filter(m => m.provider === 'Mistral')
+    },
+    {
+      name: 'Pixtral',
+      icon: Brain,
+      color: 'text-blue-600',
+      bgColor: 'bg-blue-50',
+      models: STATIC_MODEL_CONFIGS.filter(m => m.provider === 'Pixtral')
+    },
+    {
+      name: 'X.AI',
+      icon: Rocket,
+      color: 'text-gray-700',
+      bgColor: 'bg-gray-50',
+      models: STATIC_MODEL_CONFIGS.filter(m => m.provider === 'X.AI')
+    },
+    {
+      name: 'OpenRouter',
+      icon: Brain,
+      color: 'text-orange-500',
+      bgColor: 'bg-orange-50',
+      models: openRouterModels.map(model => ({
+        provider: 'OpenRouter',
+        value: model.id,
+        label: model.name.split('/').pop() || model.name,
+        icon: Brain,
+        color: 'text-orange-500',
+        bgColor: 'bg-orange-50',
+      }))
     }
-  }, [isLoading]);
+  ], [groqModels, geminiModels, openRouterModels]);
+
+  // Set default provider and model
+  React.useEffect(() => {
+    if (!isLoading && providerConfigs.length > 0) {
+      const firstProvider = providerConfigs[0];
+      setSelectedProvider(firstProvider.name);
+      if (firstProvider.models.length > 0) {
+        onModelChange(firstProvider.models[0].value);
+      }
+    }
+  }, [isLoading, providerConfigs]);
 
   const IconComponent = ({ icon: Icon, color, bgColor }: { 
     icon: React.ElementType,
@@ -199,57 +274,119 @@ export function ModelSelector({ onModelChange, compact, isChatMode }: ModelSelec
   }
 
   return (
-    <Select onValueChange={onModelChange}>
-      <SelectTrigger 
-        className={`${compact ? 'w-[160px]' : 'w-[180px]'} 
-          bg-white/10 backdrop-blur-sm border border-white/20
-          rounded-xl shadow-sm hover:shadow-md transition-all duration-200
-          ${isChatMode ? 'h-9' : 'h-9'} px-3
-          focus:outline-none focus:ring-1 focus:ring-white/30 focus:border-white/30
-          text-gray-600 hover:bg-white/20
-          group relative overflow-hidden`}
-      >
-        <div className="absolute inset-0 bg-gradient-to-r from-purple-500/10 to-blue-500/10 
-          opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
-        <SelectValue placeholder="Select Model" />
-      </SelectTrigger>
-      <SelectContent 
-        className="rounded-xl bg-white/95 backdrop-blur-xl border border-white/20 shadow-lg 
-          max-h-[280px] overflow-y-auto p-1 min-w-[160px] focus:outline-none
-          animate-in fade-in-0 zoom-in-95"
-      >
-        <SelectGroup className="px-0.5">
-          {allModelConfigs.map((model) => (
-            <SelectItem 
-              key={model.value} 
-              value={model.value}
-              className="group focus:bg-gray-50/70 rounded-lg py-0 outline-none 
-                data-[highlighted]:bg-gradient-to-r data-[highlighted]:from-purple-500/20 data-[highlighted]:to-blue-500/20
-                data-[highlighted]:outline-none
-                focus:outline-none focus:ring-0 focus-visible:outline-none
-                focus-visible:ring-0 relative overflow-hidden"
-            >
-              <motion.div 
-                className="flex items-center gap-1.5 py-1.5 px-2 rounded-lg
-                  hover:bg-gradient-to-r hover:from-purple-500/10 hover:to-blue-500/10 
-                  transition-colors duration-150
-                  focus:outline-none"
-                whileHover={{ scale: 1.01 }}
-                transition={{ type: "spring", stiffness: 400, damping: 17 }}
+    <div className="flex gap-2">
+      {/* Provider Selection */}
+      <Select value={selectedProvider} onValueChange={setSelectedProvider}>
+        <SelectTrigger 
+          className={`${compact ? 'w-[120px]' : 'w-[140px]'} 
+            bg-white/10 backdrop-blur-sm border border-white/20
+            rounded-xl shadow-sm hover:shadow-md transition-all duration-200
+            ${isChatMode ? 'h-9' : 'h-9'} px-3
+            focus:outline-none focus:ring-1 focus:ring-white/30 focus:border-white/30
+            text-gray-600 hover:bg-white/20
+            group relative overflow-hidden`}
+        >
+          <div className="absolute inset-0 bg-gradient-to-r from-purple-500/10 to-blue-500/10 
+            opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+          <SelectValue placeholder="Select Provider" />
+        </SelectTrigger>
+        <SelectContent 
+          className="rounded-xl bg-white/95 backdrop-blur-xl border border-white/20 shadow-lg 
+            max-h-[280px] overflow-y-auto p-1 min-w-[120px] focus:outline-none
+            animate-in fade-in-0 zoom-in-95"
+        >
+          <SelectGroup className="px-0.5">
+            {providerConfigs.map((provider) => (
+              <SelectItem 
+                key={provider.name} 
+                value={provider.name}
+                className="group focus:bg-gray-50/70 rounded-lg py-0 outline-none 
+                  data-[highlighted]:bg-gradient-to-r data-[highlighted]:from-purple-500/20 data-[highlighted]:to-blue-500/20
+                  data-[highlighted]:outline-none
+                  focus:outline-none focus:ring-0 focus-visible:outline-none
+                  focus-visible:ring-0 relative overflow-hidden"
               >
-                <IconComponent 
-                  icon={model.icon} 
-                  color={model.color} 
-                  bgColor={`${model.bgColor} bg-opacity-60`} 
-                />
-                <span className="text-[13px] font-medium text-gray-700 truncate">
-                  {model.provider} {model.label}
-                </span>
-              </motion.div>
-            </SelectItem>
-          ))}
-        </SelectGroup>
-      </SelectContent>
-    </Select>
+                <motion.div 
+                  className="flex items-center gap-1.5 py-1.5 px-2 rounded-lg
+                    hover:bg-gradient-to-r hover:from-purple-500/10 hover:to-blue-500/10 
+                    transition-colors duration-150
+                    focus:outline-none"
+                  whileHover={{ scale: 1.01 }}
+                  transition={{ type: "spring", stiffness: 400, damping: 17 }}
+                >
+                  <IconComponent 
+                    icon={provider.icon} 
+                    color={provider.color} 
+                    bgColor={`${provider.bgColor} bg-opacity-60`} 
+                  />
+                  <span className="text-[13px] font-medium text-gray-700 truncate">
+                    {provider.name}
+                  </span>
+                </motion.div>
+              </SelectItem>
+            ))}
+          </SelectGroup>
+        </SelectContent>
+      </Select>
+
+      {/* Model Selection */}
+      <Select 
+        onValueChange={onModelChange}
+        disabled={!selectedProvider}
+      >
+        <SelectTrigger 
+          className={`${compact ? 'w-[140px]' : 'w-[160px]'} 
+            bg-white/10 backdrop-blur-sm border border-white/20
+            rounded-xl shadow-sm hover:shadow-md transition-all duration-200
+            ${isChatMode ? 'h-9' : 'h-9'} px-3
+            focus:outline-none focus:ring-1 focus:ring-white/30 focus:border-white/30
+            text-gray-600 hover:bg-white/20
+            group relative overflow-hidden
+            disabled:opacity-50 disabled:cursor-not-allowed`}
+        >
+          <div className="absolute inset-0 bg-gradient-to-r from-purple-500/10 to-blue-500/10 
+            opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+          <SelectValue placeholder="Select Model" />
+        </SelectTrigger>
+        <SelectContent 
+          className="rounded-xl bg-white/95 backdrop-blur-xl border border-white/20 shadow-lg 
+            max-h-[280px] overflow-y-auto p-1 min-w-[140px] focus:outline-none
+            animate-in fade-in-0 zoom-in-95"
+        >
+          <SelectGroup className="px-0.5">
+            {selectedProvider && providerConfigs
+              .find(p => p.name === selectedProvider)?.models.map((model) => (
+                <SelectItem 
+                  key={model.value} 
+                  value={model.value}
+                  className="group focus:bg-gray-50/70 rounded-lg py-0 outline-none 
+                    data-[highlighted]:bg-gradient-to-r data-[highlighted]:from-purple-500/20 data-[highlighted]:to-blue-500/20
+                    data-[highlighted]:outline-none
+                    focus:outline-none focus:ring-0 focus-visible:outline-none
+                    focus-visible:ring-0 relative overflow-hidden"
+                >
+                  <motion.div 
+                    className="flex items-center gap-1.5 py-1.5 px-2 rounded-lg
+                      hover:bg-gradient-to-r hover:from-purple-500/10 hover:to-blue-500/10 
+                      transition-colors duration-150
+                      focus:outline-none"
+                    whileHover={{ scale: 1.01 }}
+                    transition={{ type: "spring", stiffness: 400, damping: 17 }}
+                  >
+                    <IconComponent 
+                      icon={model.icon} 
+                      color={model.color} 
+                      bgColor={`${model.bgColor} bg-opacity-60`} 
+                    />
+                    <span className="text-[13px] font-medium text-gray-700 truncate">
+                      {model.label}
+                    </span>
+                  </motion.div>
+                </SelectItem>
+              ))}
+          </SelectGroup>
+        </SelectContent>
+      </Select>
+    </div>
   );
 }

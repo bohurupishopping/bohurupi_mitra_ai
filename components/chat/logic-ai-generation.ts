@@ -1,6 +1,7 @@
 import { useState, useCallback } from 'react';
 import { useToast } from "@/components/ui/use-toast";
 import { ConversationService, ChatMessage } from '@/services/conversationService';
+import { FileUpload } from '@/types/conversation';
 
 interface UseAIGenerationProps {
   conversationService?: ConversationService;
@@ -186,8 +187,50 @@ Please provide an appropriate response.` : newPrompt;
     return parts.filter(p => p.trim().length > 0);
   };
 
-  const generateContent = useCallback(async (prompt: string) => {
+  const generateContent = useCallback(async (prompt: string, attachments?: FileUpload[]) => {
     try {
+      // Handle file attachments for Gemini models
+      if (selectedModel.startsWith('gemini-') && attachments?.length) {
+        const fileAttachment = attachments.find(att => 
+          !att.uploading && att.file && (
+            att.type === 'image' || 
+            att.type === 'document'
+          )
+        );
+
+        if (fileAttachment) {
+          const formData = new FormData();
+          formData.append('file', fileAttachment.file);
+          formData.append('prompt', prompt);
+          formData.append('model', selectedModel);
+
+          const response = await fetch('/api/vision', {
+            method: 'POST',
+            body: formData,
+          });
+
+          if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.error || 'Failed to generate content');
+          }
+
+          const data = await response.json();
+          
+          if (!data.result) {
+            throw new Error('No content generated');
+          }
+
+          // Save conversation with file type metadata
+          await conversationService.saveConversation(prompt, data.result);
+          
+          setGeneratedContent(data.result);
+          return {
+            content: data.result,
+            fileType: data.fileType
+          };
+        }
+      }
+
       const contextualPrompt = await buildContextualPrompt(prompt);
       const modelToUse = selectedModel;
       

@@ -22,6 +22,7 @@ import { uploadAttachment } from '@/utils/attachmentUtils';
 import { v4 as uuidv4 } from 'uuid';
 
 interface Message {
+  [x: string]: any;
   role: 'user' | 'assistant';
   content: string;
   timestamp?: string;
@@ -300,16 +301,23 @@ Feel free to ask me anything - জটিল কেস থেকে সাধা�
       'image/jpeg',
       'image/png',
       'image/gif',
+      'image/webp',
       'application/pdf',
-      'application/msword',
-      'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-      'text/plain'
+      'text/plain',
+      'text/html',
+      'text/css',
+      'text/javascript',
+      'application/x-javascript',
+      'text/x-python',
+      'text/md',
+      'text/csv',
+      'text/xml',
+      'text/rtf'
     ];
 
     for (let i = 0; i < files.length; i++) {
       const file = files[i];
       
-      // Validate file type and size
       if (!allowedTypes.includes(file.type)) {
         toast({
           title: "Invalid file type",
@@ -351,7 +359,6 @@ Feel free to ask me anything - জটিল কেস থেকে সাধা�
       for (const attachment of newAttachments) {
         const { url, path } = await uploadAttachment(attachment.file);
         
-        // Update attachment with URL and path
         setAttachments(prev => prev.map(att => 
           att.id === attachment.id 
             ? { ...att, url, path, uploading: false }
@@ -414,29 +421,44 @@ Feel free to ask me anything - জটিল কেস থেকে সাধা�
     }
   };
 
-  // Update the handleSubmit function with optimized animation handling
+  // Update the handleSubmit function
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if ((!prompt.trim() && attachments.length === 0) || isLoading) return;
 
+    // Get current attachments and file type
+    const currentAttachments = attachments
+      .filter(att => att.url)
+      .map(att => att.url as string);
+
+    const fileType = attachments.length > 0 ? attachments[0].type : undefined;
+
+    // Add message to chat
     setMessages(prev => [...prev, {
-      role: 'user',
+      role: 'user' as const,
       content: prompt,
-      attachments: attachments
-        .filter(att => att.url)
-        .map(att => att.url as string)
+      attachments: currentAttachments,
+      fileType
     }]);
+    
     setPrompt('');
     setIsLoading(true);
     setIsTyping(true);
 
     try {
-      const response = await generateContent(prompt);
+      const response = await generateContent(prompt, attachments);
       
-      if (response) {
+      if (response && typeof response === 'object' && 'content' in response) {
         setMessages(prev => [...prev, {
-          role: 'assistant',
-          content: response
+          role: 'assistant' as const,
+          content: response.content,
+          fileType: response.fileType
+        }]);
+      } else if (response) {
+        // Handle legacy response format
+        setMessages(prev => [...prev, {
+          role: 'assistant' as const,
+          content: response as string
         }]);
       }
     } catch (error) {
@@ -451,6 +473,41 @@ Feel free to ask me anything - জটিল কেস থেকে সাধা�
       setIsTyping(false);
       setAttachments([]);
     }
+  };
+
+  // Update the MessageContent component
+  const MessageContent = ({ message }: { message: Message }) => {
+    const hasAttachments = message.attachments && message.attachments.length > 0;
+    const fileType = message.fileType;
+
+    return (
+      <div className="flex flex-col gap-2">
+        {hasAttachments && fileType && (
+          <div className="flex items-center gap-2 text-sm text-gray-500">
+            {fileType === 'document' ? (
+              <File className="w-4 h-4" />
+            ) : (
+              <ImageIcon className="w-4 h-4" />
+            )}
+            <span>Attached {fileType}</span>
+          </div>
+        )}
+        <ReactMarkdown
+          components={{
+            pre: ({ node, ...props }) => (
+              <div className="overflow-x-auto max-w-full my-2">
+                <pre {...props} className="p-3 rounded-xl bg-black/5" />
+              </div>
+            ),
+            code: ({ node, ...props }) => (
+              <code {...props} className="break-words" />
+            )
+          }}
+        >
+          {message.content}
+        </ReactMarkdown>
+      </div>
+    );
   };
 
   return (
@@ -644,34 +701,7 @@ Feel free to ask me anything - জটিল কেস থেকে সাধা�
                             {message.content}
                           </div>
                         ) : (
-                          <ReactMarkdown
-                            components={{
-                              pre: ({ node, ...props }) => (
-                                <div className="overflow-x-auto max-w-full my-2">
-                                  <pre {...props} className="p-3 rounded-xl bg-black/5 
-                                    text-[0.85rem] sm:text-[0.925rem] leading-relaxed" />
-                                </div>
-                              ),
-                              code: ({ node, ...props }) => (
-                                <code {...props} className="break-words sm:break-normal 
-                                  text-[0.85rem] sm:text-[0.925rem] leading-relaxed" />
-                              ),
-                              p: ({ node, ...props }) => (
-                                <p {...props} className="break-words mb-2 last:mb-0" />
-                              ),
-                              ul: ({ node, ...props }) => (
-                                <ul {...props} className="list-disc pl-4 mb-2 space-y-1" />
-                              ),
-                              ol: ({ node, ...props }) => (
-                                <ol {...props} className="list-decimal pl-4 mb-2 space-y-1" />
-                              ),
-                              li: ({ node, ...props }) => (
-                                <li {...props} className="mb-1 last:mb-0" />
-                              )
-                            }}
-                          >
-                            {message.content}
-                          </ReactMarkdown>
+                          <MessageContent message={message} />
                         )}
                       </div>
 

@@ -3,6 +3,7 @@ export interface Message {
   content: string;
   timestamp?: string;
   attachments?: string[];
+  fileType?: 'image' | 'document';
 }
 
 export interface DatabaseMessage {
@@ -10,6 +11,7 @@ export interface DatabaseMessage {
   response: string;
   timestamp?: string;
   session_id: string;
+  file_type?: 'image' | 'document';
 }
 
 export interface FileUpload {
@@ -20,4 +22,12 @@ export interface FileUpload {
   uploading: boolean;
   url?: string;
   path?: string;
+}
+
+export interface ChatMessage {
+  role: 'user' | 'assistant';
+  content: string;
+  timestamp?: string;
+  attachments?: string[];
+  fileType?: 'image' | 'document';
 } 

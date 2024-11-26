@@ -280,7 +280,7 @@ Please provide an appropriate response.` : newPrompt;
             options: {
               maxTokens: getMaxTokens(modelToUse),
               temperature: 0.7,
-              topP: 0.4
+              topP: 0.95
             }
           }),
         });
@@ -316,7 +316,7 @@ Please provide an appropriate response.` : newPrompt;
       const options = {
         maxTokens: getMaxTokens(modelToUse),
         temperature: 0.7,
-        topP: 0.4
+        topP: 0.95
       };
 
       const response = await fetch('/api/generate', {

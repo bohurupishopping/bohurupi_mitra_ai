@@ -149,7 +149,7 @@ export async function POST(req: Request) {
         messages: [{ role: 'user', content: prompt }],
         max_tokens: options?.maxTokens || 8192,
         temperature: options?.temperature || 0.7,
-        top_p: options?.topP || 0.4,
+        top_p: options?.topP || 0.95,
         stream: false
       });
 
@@ -165,7 +165,7 @@ export async function POST(req: Request) {
         messages: [{ role: 'user', content: prompt }],
         maxTokens: options?.maxTokens || 8192,
         temperature: options?.temperature || 0.7,
-        topP: options?.topP || 0.4,
+        topP: options?.topP || 0.95,
       });
 
       result = response.text;

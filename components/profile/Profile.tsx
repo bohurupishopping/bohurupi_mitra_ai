@@ -55,6 +55,13 @@ const fadeInScale = {
   transition: springTransition
 }
 
+interface UserProfile {
+  user_id: string;
+  display_name: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
 export default function Profile() {
   const router = useRouter()
   const [user, setUser] = useState<User | null>(null)
@@ -121,7 +128,7 @@ export default function Profile() {
           .from('user_profiles')
           .select('*')
           .eq('user_id', user.id)
-          .single()
+          .single<UserProfile>()
         
         if (error && error.code === 'PGRST116') {
           const { data: newProfile, error: createError } = await supabase
@@ -135,14 +142,14 @@ export default function Profile() {
               }
             ])
             .select()
-            .single()
+            .single<UserProfile>()
           
           if (createError) throw createError
           if (newProfile) {
-            setDisplayName(newProfile.display_name || '')
+            setDisplayName(newProfile.display_name ?? '')
           }
         } else if (profile) {
-          setDisplayName(profile.display_name || '')
+          setDisplayName(profile.display_name ?? '')
         }
       }
     } catch (error) {

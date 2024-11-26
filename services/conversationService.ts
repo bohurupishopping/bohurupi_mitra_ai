@@ -3,6 +3,7 @@
 import { v4 as uuidv4 } from 'uuid';
 import type { DatabaseMessage } from '@/types/conversation';
 import { getSupabaseClient } from '@/lib/supabaseClient';
+import { SupabaseClient } from '@supabase/supabase-js';
 
 export interface ChatSession {
   session_id: string;
@@ -17,9 +18,16 @@ export interface ChatMessage {
   timestamp?: string;
 }
 
+export class ConversationError extends Error {
+  constructor(message: string, public readonly cause?: unknown) {
+    super(message);
+    this.name = 'ConversationError';
+  }
+}
+
 export class ConversationService {
-  private sessionId: string;
-  private supabase;
+  private readonly sessionId: string;
+  private readonly supabase: SupabaseClient;
 
   constructor(sessionId?: string) {
     this.sessionId = sessionId || uuidv4();
@@ -29,15 +37,20 @@ export class ConversationService {
   private async getCurrentUser() {
     try {
       const { data: { session }, error } = await this.supabase.auth.getSession();
-      if (error) throw error;
+      if (error) {
+        throw new ConversationError('Failed to get current user session', error);
+      }
       return session?.user || null;
     } catch (error) {
-      console.error('Error getting current user:', error);
-      return null;
+      throw new ConversationError('Error getting current user', error);
     }
   }
 
-  async saveConversation(prompt: string, response: string) {
+  async saveConversation(prompt: string, response: string): Promise<string> {
+    if (!prompt || !response) {
+      throw new ConversationError('Prompt and response are required');
+    }
+
     try {
       const user = await this.getCurrentUser();
       const messageId = uuidv4();
@@ -52,21 +65,29 @@ export class ConversationService {
             prompt,
             response,
             timestamp: new Date().toISOString(),
+            is_deleted: false,
           },
         ]);
 
-      if (error) throw error;
+      if (error) {
+        throw new ConversationError('Failed to save conversation', error);
+      }
       
-      window.dispatchEvent(new CustomEvent('chat-updated'));
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('chat-updated'));
+      }
       
       return messageId;
     } catch (error) {
-      console.error('Error saving conversation:', error);
-      throw error;
+      throw new ConversationError('Error saving conversation', error);
     }
   }
 
   async loadChatSession(sessionId: string): Promise<ChatMessage[]> {
+    if (!sessionId) {
+      throw new ConversationError('Session ID is required');
+    }
+
     try {
       const user = await this.getCurrentUser();
       
@@ -85,19 +106,36 @@ export class ConversationService {
 
       const { data, error } = await query;
 
-      if (error) throw error;
+      if (error) {
+        throw new ConversationError('Failed to load chat session', error);
+      }
+
+      if (!data) {
+        return [];
+      }
 
       return data.map((msg: DatabaseMessage): ChatMessage[] => ([
-        { role: 'user' as const, content: msg.prompt },
-        { role: 'assistant' as const, content: msg.response }
+        { 
+          role: 'user',
+          content: msg.prompt,
+          timestamp: msg.timestamp 
+        },
+        { 
+          role: 'assistant',
+          content: msg.response,
+          timestamp: msg.timestamp 
+        }
       ])).flat();
     } catch (error) {
-      console.error('Error loading chat session:', error);
-      throw error;
+      throw new ConversationError('Error loading chat session', error);
     }
   }
 
   async getChatSessions(limit: number = 7): Promise<ChatSession[]> {
+    if (limit < 1) {
+      throw new ConversationError('Limit must be greater than 0');
+    }
+
     try {
       const user = await this.getCurrentUser();
       
@@ -115,16 +153,17 @@ export class ConversationService {
 
       const { data: sessions, error } = await query;
 
-      if (error) throw error;
+      if (error) {
+        throw new ConversationError('Failed to get chat sessions', error);
+      }
 
-      const sessionMap = new Map<string, {
-        session_id: string;
-        last_message: string;
-        timestamp: string;
-        message_count: number;
-      }>();
+      if (!sessions) {
+        return [];
+      }
 
-      sessions?.forEach(msg => {
+      const sessionMap = new Map<string, ChatSession>();
+
+      sessions.forEach(msg => {
         if (!sessionMap.has(msg.session_id)) {
           sessionMap.set(msg.session_id, {
             session_id: msg.session_id,
@@ -133,23 +172,22 @@ export class ConversationService {
             message_count: 1
           });
         } else {
-          const session = sessionMap.get(msg.session_id)!;
-          session.message_count += 1;
+          const session = sessionMap.get(msg.session_id);
+          if (session) {
+            session.message_count += 1;
+          }
         }
       });
 
-      const formattedSessions = Array.from(sessionMap.values())
+      return Array.from(sessionMap.values())
         .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
         .slice(0, limit);
-
-      return formattedSessions;
     } catch (error) {
-      console.error('Error getting chat sessions:', error);
-      return [];
+      throw new ConversationError('Error getting chat sessions', error);
     }
   }
 
-  async clearConversationHistory() {
+  async clearConversationHistory(): Promise<void> {
     try {
       const user = await this.getCurrentUser();
       
@@ -164,16 +202,23 @@ export class ConversationService {
       }
 
       const { error } = await query;
-      if (error) throw error;
+      if (error) {
+        throw new ConversationError('Failed to clear conversation history', error);
+      }
       
-      window.dispatchEvent(new CustomEvent('chat-updated'));
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('chat-updated'));
+      }
     } catch (error) {
-      console.error('Error clearing conversation history:', error);
-      throw error;
+      throw new ConversationError('Error clearing conversation history', error);
     }
   }
 
-  async deleteChatSession(sessionId: string) {
+  async deleteChatSession(sessionId: string): Promise<void> {
+    if (!sessionId) {
+      throw new ConversationError('Session ID is required');
+    }
+
     try {
       const user = await this.getCurrentUser();
       
@@ -189,12 +234,15 @@ export class ConversationService {
       }
 
       const { error } = await query;
-      if (error) throw error;
+      if (error) {
+        throw new ConversationError('Failed to delete chat session', error);
+      }
       
-      window.dispatchEvent(new CustomEvent('chat-updated'));
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('chat-updated'));
+      }
     } catch (error) {
-      console.error('Error deleting chat session:', error);
-      throw error;
+      throw new ConversationError('Error deleting chat session', error);
     }
   }
 
@@ -203,6 +251,10 @@ export class ConversationService {
   }
 
   async getRecentConversations(limit: number = 5): Promise<ChatMessage[]> {
+    if (limit < 1) {
+      throw new ConversationError('Limit must be greater than 0');
+    }
+
     try {
       const user = await this.getCurrentUser();
       
@@ -221,15 +273,28 @@ export class ConversationService {
 
       const { data, error } = await query;
 
-      if (error) throw error;
+      if (error) {
+        throw new ConversationError('Failed to get recent conversations', error);
+      }
+
+      if (!data) {
+        return [];
+      }
 
       return data.map((msg: DatabaseMessage): ChatMessage[] => ([
-        { role: 'user' as const, content: msg.prompt },
-        { role: 'assistant' as const, content: msg.response }
+        { 
+          role: 'user',
+          content: msg.prompt,
+          timestamp: msg.timestamp 
+        },
+        { 
+          role: 'assistant',
+          content: msg.response,
+          timestamp: msg.timestamp 
+        }
       ])).flat();
     } catch (error) {
-      console.error('Error getting recent conversations:', error);
-      return [];
+      throw new ConversationError('Error getting recent conversations', error);
     }
   }
 }

@@ -71,7 +71,7 @@ export async function POST(req: NextRequest) {
 
     // Initialize Gemini model with appropriate configuration
     const geminiModel = genAI.getGenerativeModel({ 
-      model: model || "gemini-1.5-pro",
+      model: model || "gemini-1.5-flash",
       generationConfig: {
         temperature: 0.7,
         topP: 0.8,

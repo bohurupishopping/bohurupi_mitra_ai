@@ -1,28 +1,31 @@
 "use client";
 
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, Suspense } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
-  FileText, Upload, MessageSquare, Code2, Image as ImageIcon, 
-  File, RefreshCw, X, FileJson, ScrollText, FileQuestion,
-  ChevronRight, Sparkles
+  FileText, Upload, File, RefreshCw, X, ChevronRight
 } from 'lucide-react';
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/components/ui/use-toast";
 import { Textarea } from "@/components/ui/textarea";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useDocumentAI } from '@/components/document/logic-document-ai';
-import { DocumentPreview } from '@/components/document/DocumentPreview';
 import { FileUpload } from '@/types/conversation';
 import { uploadAttachment } from '@/utils/attachmentUtils';
 import { v4 as uuidv4 } from 'uuid';
 import ReactMarkdown from 'react-markdown';
 import Sidebar from '@/components/shared/Sidebar';
 
-const DocumentAI = () => {
-  const [isLoading, setIsLoading] = useState(false);
-  const [prompt, setPrompt] = useState('');
+// Loading component
+const LoadingState = () => (
+  <div className="flex items-center justify-center h-screen">
+    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-sky-500" />
+  </div>
+);
+
+// Main component
+const DocumentAIContent: React.FC = () => {
+  const [isLoading, setIsLoading] = useState<boolean>(false);
+  const [prompt, setPrompt] = useState<string>('');
   const [result, setResult] = useState<string>('');
   const [attachments, setAttachments] = useState<FileUpload[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -56,40 +59,40 @@ const DocumentAI = () => {
     ];
 
     for (let i = 0; i < files.length; i++) {
-      const file = files[i];
+      const currentFile = files[i];
       
-      if (!allowedTypes.includes(file.type)) {
+      if (!allowedTypes.includes(currentFile.type)) {
         toast({
           title: "Invalid file type",
-          description: `${file.name} is not a supported file type`,
+          description: `${currentFile.name} is not a supported file type`,
           variant: "destructive"
         });
         continue;
       }
 
-      if (file.size > maxSize) {
+      if (currentFile.size > maxSize) {
         toast({
           title: "File too large",
-          description: `${file.name} exceeds the 50MB limit`,
+          description: `${currentFile.name} exceeds the 50MB limit`,
           variant: "destructive"
         });
         continue;
       }
 
-      const isImage = file.type.startsWith('image/');
+      const isImage = currentFile.type.startsWith('image/');
       
-      const attachment: FileUpload = {
+      const newAttachment: FileUpload = {
         id: uuidv4(),
-        file,
+        file: currentFile,
         type: isImage ? 'image' : 'document',
         uploading: true
       };
 
       if (isImage) {
-        attachment.preview = URL.createObjectURL(file);
+        newAttachment.preview = URL.createObjectURL(currentFile);
       }
 
-      newAttachments.push(attachment);
+      newAttachments.push(newAttachment);
     }
 
     setAttachments(prev => [...prev, ...newAttachments]);
@@ -432,6 +435,15 @@ const DocumentAI = () => {
         </div>
       </div>
     </div>
+  );
+};
+
+// Page component with Suspense
+const DocumentAI: React.FC = () => {
+  return (
+    <Suspense fallback={<LoadingState />}>
+      <DocumentAIContent />
+    </Suspense>
   );
 };
 

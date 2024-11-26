@@ -13,21 +13,26 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import ReactMarkdown from 'react-markdown';
 import { LivelyService } from '@/services/livelyService';
 
-interface Message {
-  role: 'user' | 'assistant';
-  content: string;
-  timestamp?: string;
+interface ChatMessage {
+  role: 'user' | 'model';
+  parts: { text: string }[];
+}
+
+interface ChatConfig {
+  model: string;
+  initialHistory: ChatMessage[];
 }
 
 interface LivelyChatInterfaceProps {
   defaultMessage?: string;
   sessionId?: string;
+  config?: ChatConfig;
 }
 
-export default function LivelyChatInterface({ defaultMessage, sessionId }: LivelyChatInterfaceProps) {
-  const [messages, setMessages] = useState<Message[]>([{
-    role: 'assistant',
-    content: defaultMessage || "# Hello! 👋\n\nI'm your Lively AI assistant powered by Gemini Pro. Ask me anything!"
+export default function LivelyChatInterface({ defaultMessage, sessionId, config }: LivelyChatInterfaceProps) {
+  const [messages, setMessages] = useState<ChatMessage[]>(config?.initialHistory || [{
+    role: 'model',
+    parts: [{ text: defaultMessage || "Hello! How can I help you today?" }]
   }]);
   const [prompt, setPrompt] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -44,35 +49,13 @@ export default function LivelyChatInterface({ defaultMessage, sessionId }: Livel
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
-  useEffect(() => {
-    const loadChatHistory = async () => {
-      if (sessionId) {
-        try {
-          const history = await livelyService.loadChatSession(sessionId);
-          if (history.length > 0) {
-            setMessages(history);
-          }
-        } catch (error) {
-          console.error('Error loading chat history:', error);
-          toast({
-            title: "Error",
-            description: "Failed to load chat history",
-            variant: "destructive",
-          });
-        }
-      }
-    };
-
-    loadChatHistory();
-  }, [sessionId, livelyService]);
-
   const toggleSearch = () => {
     setIsSearching(!isSearching);
     setSearchQuery('');
   };
 
   const filteredMessages = messages.filter(message => 
-    message.content.toLowerCase().includes(searchQuery.toLowerCase())
+    message.parts[0].text.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
   const copyToClipboard = async (text: string, index: number) => {
@@ -99,9 +82,9 @@ export default function LivelyChatInterface({ defaultMessage, sessionId }: Livel
     e.preventDefault();
     if (!prompt.trim() || isLoading) return;
 
-    const userMessage: Message = {
+    const userMessage: ChatMessage = {
       role: 'user',
-      content: prompt
+      parts: [{ text: prompt }]
     };
 
     setMessages(prev => [...prev, userMessage]);
@@ -115,7 +98,11 @@ export default function LivelyChatInterface({ defaultMessage, sessionId }: Livel
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ prompt }),
+        body: JSON.stringify({ 
+          prompt,
+          history: messages,
+          config: config
+        }),
       });
 
       if (!response.ok) {
@@ -125,18 +112,17 @@ export default function LivelyChatInterface({ defaultMessage, sessionId }: Livel
       const data = await response.json();
 
       if (data.result) {
-        const assistantMessage: Message = {
-          role: 'assistant',
-          content: data.result
+        const assistantMessage: ChatMessage = {
+          role: 'model',
+          parts: [{ text: data.result }]
         };
 
         setMessages(prev => [...prev, assistantMessage]);
         
-        // Save conversation with grounding metadata
+        // Save conversation
         await livelyService.saveConversation(
           prompt, 
-          data.result, 
-          data.groundingMetadata
+          data.result
         );
       }
     } catch (error) {
@@ -190,8 +176,8 @@ export default function LivelyChatInterface({ defaultMessage, sessionId }: Livel
                       try {
                         if (window.confirm('Are you sure you want to clear the chat?')) {
                           setMessages([{
-                            role: 'assistant',
-                            content: defaultMessage || "# Hello! 👋\n\nI'm your Lively AI assistant powered by Gemini Pro. Ask me anything!"
+                            role: 'model',
+                            parts: [{ text: defaultMessage || "Hello! How can I help you today?" }]
                           }]);
 
                           if (sessionId) {
@@ -306,10 +292,10 @@ export default function LivelyChatInterface({ defaultMessage, sessionId }: Livel
                             message.role === 'user' ? 'text-white/90' : ''
                           }`}>
                             {message.role === 'user' ? (
-                              <div className="text-white leading-relaxed">{message.content}</div>
+                              <div className="text-white leading-relaxed">{message.parts[0].text}</div>
                             ) : (
                               <div className="space-y-1">
-                                <ReactMarkdown>{message.content}</ReactMarkdown>
+                                <ReactMarkdown>{message.parts[0].text}</ReactMarkdown>
                               </div>
                             )}
                           </div>
@@ -325,7 +311,7 @@ export default function LivelyChatInterface({ defaultMessage, sessionId }: Livel
                                         ? 'text-white/70 hover:text-white hover:bg-white/10' 
                                         : 'text-gray-500 hover:text-gray-700 hover:bg-gray-100/50'
                                       } active:scale-95 transition-all duration-200`}
-                                    onClick={() => copyToClipboard(message.content, index)}
+                                    onClick={() => copyToClipboard(message.parts[0].text, index)}
                                   >
                                     {copiedIndex === index ? (
                                       <Check className="h-3 w-3" />

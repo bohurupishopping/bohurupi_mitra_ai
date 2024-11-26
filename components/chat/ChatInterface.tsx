@@ -228,10 +228,10 @@ function ChatInterface({ defaultMessage, sessionId, onModelChange }: ChatInterfa
 
 আমি ফেলুদা এ.আই। জ্ঞান আর মগজাস্ত্র নিয়ে তোমার কাছে এসেছি, লালমোহন বাবুর মতো গল্প বলার ক্ষমতা আমার নেই, কিন্তু টেলিপ‍্যাথির জোর আছে!
 
-- 🔍 **Problem Solving** - Using my Magajastra
-- 📚 **Knowledge Sharing** - Across diverse domains
-- 💡 **Creative Assistance** - For various tasks
-- 🤝 **Thoughtful Discussions** - On any topic
+- 🔍 **Problem Solving** 
+- 📚 **Knowledge Sharing** 
+- 💡 **Creative Assistance**
+- 🤝 **Thoughtful Discussions**
 
 *"কোনো প্রশ্ন আছে?" - Do you have any questions?* 🕵️‍♂️`
   }]);
@@ -565,10 +565,10 @@ function ChatInterface({ defaultMessage, sessionId, onModelChange }: ChatInterfa
 
 আমি ফেলুদা এ.আই। জ্ঞান আর মগজাস্ত্র নিয়ে তোমার কাছে এসেছি, লালমোহন বাবুর মতো গল্প বলার ক্ষমতা আমার নেই, কিন্তু টেলিপ‍্যাথির জোর আছে!
 
-- 🔍 **Problem Solving** - Using my Magajastra
-- 📚 **Knowledge Sharing** - Across diverse domains
-- 💡 **Creative Assistance** - For various tasks
-- 🤝 **Thoughtful Discussions** - On any topic
+- 🔍 **Problem Solving** 
+- 📚 **Knowledge Sharing** 
+- 💡 **Creative Assistance**
+- 🤝 **Thoughtful Discussions**
 
 *"কোনো প্রশ্ন আছে?" - Do you have any questions?* 🕵️‍♂️`
                           }]);

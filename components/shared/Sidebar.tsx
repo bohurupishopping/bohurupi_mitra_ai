@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useRouter, useSearchParams, usePathname } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Button } from "@/components/ui/button";
@@ -35,12 +35,19 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { ConversationService, ChatSession } from '@/services/conversationService';
-import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 import { Database } from '@/types/supabase';
+import { getSupabaseClient } from '@/lib/supabaseClient';
+import { PostgrestError } from '@supabase/supabase-js';
 
 interface SidebarProps {
   isOpen: boolean;
   onToggle: () => void;
+}
+
+interface UserProfile {
+  user_id: string;
+  display_name: string | null;
+  // Add other fields if needed
 }
 
 export default function Sidebar({ isOpen, onToggle }: SidebarProps) {
@@ -53,9 +60,11 @@ export default function Sidebar({ isOpen, onToggle }: SidebarProps) {
   const { toast } = useToast();
   const [userEmail, setUserEmail] = useState<string | null>(null);
   const [chatSessions, setChatSessions] = useState<ChatSession[]>([]);
-  const [conversationService] = useState(() => new ConversationService(currentSessionId || undefined));
   const [userProfile, setUserProfile] = useState<{ display_name: string | null }>({ display_name: null });
-  const supabase = createClientComponentClient<Database>();
+  
+  // Use useMemo to ensure consistent reference
+  const supabase = useMemo(() => getSupabaseClient(), []);
+  const conversationService = useMemo(() => new ConversationService(currentSessionId || undefined), [currentSessionId]);
 
   const loadChatSessions = useCallback(async () => {
     try {
@@ -83,6 +92,43 @@ export default function Sidebar({ isOpen, onToggle }: SidebarProps) {
     }
   }, [conversationService, toast]);
 
+  // Fetch user profile
+  const fetchUserProfile = useCallback(async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        const { data: profile, error } = await supabase
+          .from('user_profiles')
+          .select('display_name')
+          .eq('user_id', user.id)
+          .single<Pick<UserProfile, 'display_name'>>();
+
+        if (error) {
+          const postgrestError = error as PostgrestError;
+          console.error('Error fetching user profile:', postgrestError.message);
+          return;
+        }
+
+        if (profile) {
+          setUserProfile({ display_name: profile.display_name ?? null });
+          if (user.email) {
+            setUserEmail(user.email);
+          }
+        }
+      }
+    } catch (error) {
+      if (error instanceof Error) {
+        console.error('Error fetching user data:', error.message);
+      } else {
+        console.error('Unknown error fetching user data');
+      }
+    }
+  }, [supabase]);
+
+  useEffect(() => {
+    fetchUserProfile();
+  }, [fetchUserProfile]);
+
   useEffect(() => {
     loadChatSessions();
   }, [currentSessionId, loadChatSessions]);
@@ -99,37 +145,24 @@ export default function Sidebar({ isOpen, onToggle }: SidebarProps) {
   }, []);
 
   useEffect(() => {
-    window.addEventListener('chat-updated', loadChatSessions);
-    return () => window.removeEventListener('chat-updated', loadChatSessions);
+    const handleChatUpdate = () => loadChatSessions();
+    window.addEventListener('chat-updated', handleChatUpdate);
+    return () => window.removeEventListener('chat-updated', handleChatUpdate);
   }, [loadChatSessions]);
 
+  // Auth state change listener
   useEffect(() => {
-    const fetchUserProfile = async () => {
-      try {
-        const { data: { user } } = await supabase.auth.getUser();
-        if (user) {
-          const { data: profile, error } = await supabase
-            .from('user_profiles')
-            .select('display_name')
-            .eq('user_id', user.id)
-            .single();
-
-          if (error) {
-            console.error('Error fetching user profile:', error);
-            return;
-          }
-
-          if (profile) {
-            setUserProfile({ display_name: profile.display_name });
-          }
-        }
-      } catch (error) {
-        console.error('Error fetching user data:', error);
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
+      if (event === 'SIGNED_OUT') {
+        router.push('/login');
+        router.refresh();
       }
-    };
+    });
 
-    fetchUserProfile();
-  }, [supabase]);
+    return () => {
+      subscription.unsubscribe();
+    };
+  }, [supabase, router]);
 
   const handleDeleteSession = async (sessionId: string) => {
     try {
@@ -207,7 +240,6 @@ export default function Sidebar({ isOpen, onToggle }: SidebarProps) {
 
   const handleSignOut = async () => {
     try {
-      const supabase = createClientComponentClient();
       const { error } = await supabase.auth.signOut();
       
       if (error) {
@@ -364,7 +396,9 @@ export default function Sidebar({ isOpen, onToggle }: SidebarProps) {
                       exit={{ opacity: 0, x: -10 }}
                       className="flex flex-col items-start"
                     >
-                      <span className="text-sm font-medium">{item.label}</span>
+                      <span className="text-sm font-medium text-gray-700 truncate max-w-[120px] group-hover:text-gray-900">
+                        {item.label}
+                      </span>
                       <span className="text-xs text-gray-500">{item.description}</span>
                     </motion.div>
                   )}

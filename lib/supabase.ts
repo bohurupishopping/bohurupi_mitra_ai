@@ -1,9 +1,9 @@
-import { createClient } from '@supabase/supabase-js';
+import { getSupabaseClient } from './supabaseClient';
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
+const supabase = getSupabaseClient();
 
-export const supabase = createClient(supabaseUrl, supabaseAnonKey);
+export { supabase };
+
 supabase.auth.onAuthStateChange((event, session) => {
   if (event === 'SIGNED_OUT') {
     // Delete any client-side data here

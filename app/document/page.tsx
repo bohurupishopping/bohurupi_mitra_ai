@@ -38,6 +38,8 @@ const DocumentAIContent: React.FC = () => {
   const [result, setResult] = useState<string>('');
   const [attachments, setAttachments] = useState<FileUpload[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const welcomeFileInputRef = useRef<HTMLInputElement>(null);
+  const enhancedFileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
   const { processDocument } = useDocumentAI({
     defaultModel: 'gemini-1.5-flash'
@@ -192,6 +194,12 @@ const DocumentAIContent: React.FC = () => {
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
     }
+    if (welcomeFileInputRef.current) {
+      welcomeFileInputRef.current.value = '';
+    }
+    if (enhancedFileInputRef.current) {
+      enhancedFileInputRef.current.value = '';
+    }
   };
 
   const removeAttachment = (id: string) => {
@@ -269,15 +277,11 @@ const DocumentAIContent: React.FC = () => {
                   className="relative group cursor-pointer mb-8"
                   onDragOver={handleDragOver}
                   onDrop={handleDrop}
+                  onClick={() => welcomeFileInputRef.current?.click()}
                 >
                   <motion.div
                     whileHover={{ scale: 1.01 }}
                     className="relative"
-                    onClick={(e) => {
-                      e.preventDefault();
-                      e.stopPropagation();
-                      fileInputRef.current?.click();
-                    }}
                   >
                     <div className="absolute -inset-1 bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500 
                       rounded-2xl blur opacity-10 group-hover:opacity-20 transition duration-200" />
@@ -299,6 +303,16 @@ const DocumentAIContent: React.FC = () => {
                     </div>
                   </motion.div>
                 </div>
+
+                {/* Hidden file input for Welcome Section */}
+                <input
+                  type="file"
+                  ref={welcomeFileInputRef}
+                  className="hidden"
+                  onChange={handleFileSelect}
+                  multiple
+                  accept="image/jpeg,image/png,image/gif,image/webp,application/pdf,text/plain,text/html,text/css,text/javascript,application/x-javascript,text/x-python,text/md,text/csv,text/xml,text/rtf"
+                />
 
                 {/* Feature Options Grid */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -554,7 +568,7 @@ const DocumentAIContent: React.FC = () => {
                     rounded-[20px] blur opacity-10 group-hover:opacity-20 transition duration-200" />
 
                   <div className="relative bg-white/80 dark:bg-gray-900/80 rounded-[18px]
-                    shadow-[0_4px_20px_rgb(0,0,0,0.04)] backdrop-blur-xl 
+                    shadow-[0_4px_20px_-2px_rgba(0,0,0,0.04)] backdrop-blur-xl 
                     border border-white/20 dark:border-white/10 overflow-hidden">
                     <form onSubmit={handleSubmit} className="flex flex-col gap-2 p-3">
                       {/* Text Input Area with Border */}
@@ -596,28 +610,32 @@ const DocumentAIContent: React.FC = () => {
                         {/* Enhanced Upload Button */}
                         <motion.div
                           whileHover={{ scale: 1.02 }}
-                          whileTap={{ scale: 0.95 }}
+                          whileTap={{ scale: 0.98 }}
+                          onClick={() => enhancedFileInputRef.current?.click()}
+                          className="relative group cursor-pointer"
                         >
-                          <Button
+                          <button
                             type="button"
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => fileInputRef.current?.click()}
-                            className="relative group/btn flex items-center gap-2 py-2 px-3 rounded-xl
-                              bg-gradient-to-r from-sky-50 to-emerald-50 dark:from-sky-900/20 dark:to-emerald-900/20
-                              hover:from-sky-100 hover:to-emerald-100 dark:hover:from-sky-900/40 dark:hover:to-emerald-900/40
-                              border border-sky-200/20 dark:border-sky-500/20
-                              shadow-[0_2px_10px_-2px_rgba(0,0,0,0.04)]
-                              hover:shadow-[0_4px_16px_-4px_rgba(0,0,0,0.1)]
-                              transition-all duration-200"
+                            className="flex items-center gap-2 py-1.5 px-3 rounded-xl text-xs
+                              bg-white/50 hover:bg-gray-100/50 border-white/20
+                              border backdrop-blur-sm transition-all duration-200"
                           >
-                            <Upload className="w-4 h-4 text-sky-500 dark:text-sky-400" />
-                            <span className="text-xs font-medium bg-gradient-to-r from-sky-600 to-emerald-600 
-                              dark:from-sky-400 dark:to-emerald-400 bg-clip-text text-transparent">
+                            <Upload className="w-4 h-4 text-gray-500" />
+                            <span className="font-medium text-gray-600 dark:text-gray-400">
                               Upload
                             </span>
-                          </Button>
+                          </button>
                         </motion.div>
+
+                        {/* Hidden file input for Enhanced Input Area */}
+                        <input
+                          type="file"
+                          ref={enhancedFileInputRef}
+                          className="hidden"
+                          onChange={handleFileSelect}
+                          multiple
+                          accept="image/jpeg,image/png,image/gif,image/webp,application/pdf,text/plain,text/html,text/css,text/javascript,application/x-javascript,text/x-python,text/md,text/csv,text/xml,text/rtf"
+                        />
 
                         <div className="flex-1" />
 
@@ -662,7 +680,7 @@ const DocumentAIContent: React.FC = () => {
                   onChange={handleFileSelect}
                   className="hidden"
                   multiple
-                  accept="image/*,.pdf,.doc,.docx,.txt,.html,.css,.js,.py,.md,.csv,.xml,.rtf"
+                  accept="image/jpeg,image/png,image/gif,image/webp,application/pdf,text/plain,text/html,text/css,text/javascript,application/x-javascript,text/x-python,text/md,text/csv,text/xml,text/rtf"
                 />
               </div>
             </div>

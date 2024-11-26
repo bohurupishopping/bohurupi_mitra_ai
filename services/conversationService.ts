@@ -1,8 +1,8 @@
 "use client";
 
-import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 import { v4 as uuidv4 } from 'uuid';
 import type { DatabaseMessage } from '@/types/conversation';
+import { getSupabaseClient } from '@/lib/supabaseClient';
 
 export interface ChatSession {
   session_id: string;
@@ -18,12 +18,12 @@ export interface ChatMessage {
 }
 
 export class ConversationService {
-  private supabase;
   private sessionId: string;
+  private supabase;
 
   constructor(sessionId?: string) {
-    this.supabase = createClientComponentClient();
     this.sessionId = sessionId || uuidv4();
+    this.supabase = getSupabaseClient();
   }
 
   private async getCurrentUser() {

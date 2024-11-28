@@ -274,44 +274,39 @@ export default function Sidebar({ isOpen, onToggle }: SidebarProps) {
       {/* Mobile Menu Button */}
       {isMobile && isCollapsed && (
         <motion.button
-          className="fixed left-4 top-1/2 -translate-y-1/2 z-50 
-            bg-white/80 backdrop-blur-xl rounded-2xl p-3
-            shadow-lg border border-white/20
-            hover:bg-white/90 transition-all duration-300
-            hover:scale-110 active:scale-95
-            hover:shadow-xl
+          className="fixed left-4 top-4 z-50 
+            bg-white/80 backdrop-blur-sm rounded-xl p-2.5
+            shadow-sm border border-white/20
+            hover:bg-white/90 transition-colors duration-200
             group"
           onClick={() => setIsCollapsed(false)}
-          initial={{ opacity: 0, scale: 0.8, x: -20 }}
-          animate={{ opacity: 1, scale: 1, x: 0 }}
-          exit={{ opacity: 0, scale: 0.8, x: -20 }}
+          initial={false}
+          animate={{ opacity: 1 }}
+          transition={{ duration: 0.2 }}
         >
-          <PanelLeftOpen className="h-6 w-6 text-gray-600 group-hover:text-gray-900 
-            transition-all duration-300 group-hover:scale-110" />
+          <Menu className="h-5 w-5 text-gray-600 group-hover:text-gray-900" />
         </motion.button>
       )}
 
       <motion.div 
-        className={`fixed md:relative z-50 h-screen
-          bg-gradient-to-b from-white/60 via-white/50 to-white/40
-          backdrop-blur-2xl border border-white/20
-          transition-all duration-300 ease-in-out
+        className={`fixed md:relative z-40 h-screen
+          bg-white/60 backdrop-blur-xl border-r border-white/20
+          transition-colors duration-200
           flex flex-col overflow-hidden
-          ${isCollapsed ? 'w-16' : 'w-[240px]'}
-          shadow-[0_8px_32px_rgba(0,0,0,0.06)]
-          hover:shadow-[0_12px_40px_rgba(0,0,0,0.12)]
+          ${isCollapsed ? 'w-0 md:w-16' : 'w-[240px]'}
+          shadow-sm hover:shadow-md
           md:rounded-[2.5rem] md:m-4 md:h-[calc(100vh-32px)]
-          before:absolute before:inset-0 
-          before:bg-gradient-to-br before:from-blue-100/20 before:via-purple-100/20 before:to-pink-100/20
-          before:animate-gradient-xy before:opacity-60 before:-z-10
+          md:border
           ${isMobile ? 'h-full pb-safe-area-inset-bottom' : ''}`}
         initial={false}
         animate={{ 
-          width: isCollapsed ? 64 : 240,
-          x: isMobile && isCollapsed ? -240 : 0,
-          height: isMobile ? '100%' : 'calc(100vh-32px)'
+          width: isCollapsed ? isMobile ? 0 : 64 : 240,
+          opacity: isCollapsed && isMobile ? 0 : 1
         }}
-        transition={{ duration: 0.3, ease: [0.4, 0, 0.2, 1] }}
+        transition={{ 
+          duration: 0.2,
+          ease: 'easeInOut'
+        }}
       >
         {/* Header */}
         <div className="flex items-center p-4 border-b border-white/20 backdrop-blur-sm bg-white/20">
@@ -442,9 +437,9 @@ export default function Sidebar({ isOpen, onToggle }: SidebarProps) {
                   return (
                     <motion.div
                       key={session.session_id}
-                      initial={{ opacity: 0, y: 5 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      exit={{ opacity: 0, y: -5 }}
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      transition={{ duration: 0.2, delay: index * 0.05 }}
                       className="mb-1.5"
                     >
                       <div className={`group relative p-2.5 rounded-xl 
@@ -576,18 +571,19 @@ export default function Sidebar({ isOpen, onToggle }: SidebarProps) {
         </div>
 
         {/* Mobile Close Button */}
-        {isMobile && (
+        {isMobile && !isCollapsed && (
           <motion.button
             className="absolute right-3 top-4
-              bg-white/80 backdrop-blur-xl rounded-2xl p-2.5
-              shadow-lg border border-white/20
-              hover:bg-white/90 transition-colors duration-300
+              bg-white/80 backdrop-blur-sm rounded-xl p-2.5
+              shadow-sm border border-white/20
+              hover:bg-white/90 transition-colors duration-200
               group z-50"
             onClick={() => setIsCollapsed(true)}
             initial={false}
-            animate={{ rotate: isCollapsed ? 0 : 180 }}
+            animate={{ opacity: 1 }}
+            transition={{ duration: 0.2 }}
           >
-            <X className="h-4 w-4 text-gray-600 group-hover:text-gray-900 transition-colors" />
+            <X className="h-4 w-4 text-gray-600 group-hover:text-gray-900" />
           </motion.button>
         )}
       </motion.div>

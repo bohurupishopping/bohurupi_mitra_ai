@@ -18,6 +18,53 @@ import ImageTypeSelector from '@/components/imagine/ImageTypeSelector';
 import ModelSelector from '@/components/imagine/ModelSelector';
 import SizeSelector from '@/components/imagine/SizeSelector';
 
+// Optimize image variants for better performance
+const imageVariants = {
+  hidden: { 
+    opacity: 0,
+    y: 5
+  },
+  visible: { 
+    opacity: 1,
+    y: 0,
+    transition: { 
+      duration: 0.2,
+      ease: "easeOut"
+    }
+  },
+  exit: { 
+    opacity: 0,
+    transition: { 
+      duration: 0.15,
+      ease: "easeIn"
+    }
+  },
+  hover: {
+    y: -2,
+    transition: {
+      duration: 0.2,
+      ease: "easeOut"
+    }
+  }
+};
+
+// Optimize loading variants
+const loadingVariants = {
+  initial: { opacity: 0 },
+  animate: { 
+    opacity: 1,
+    transition: {
+      duration: 0.2
+    }
+  },
+  exit: { 
+    opacity: 0,
+    transition: {
+      duration: 0.15
+    }
+  }
+};
+
 function ImagineContent() {
   const [prompt, setPrompt] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -37,102 +84,34 @@ function ImagineContent() {
   const [isPreloading, setIsPreloading] = useState(false);
   const [selectedStyle, setSelectedStyle] = useState('(photorealistic:1.4), (hyperrealistic:1.3), masterpiece, professional photography, 8k resolution, highly detailed, sharp focus, HDR, high contrast, cinematic lighting, volumetric lighting, ambient occlusion, ray tracing, professional color grading, dramatic atmosphere, shot on Hasselblad H6D-400C, 100mm f/2.8 lens, golden hour photography, detailed textures, intricate details, pristine quality, award-winning photography');
 
-  // Add virtual scrolling ref
-  const { ref: gridRef, inView } = useInView({
-    threshold: 0,
-    triggerOnce: false
-  });
-
   // Add scroll container ref
   const scrollContainerRef = useRef<HTMLDivElement>(null);
 
-  // Smooth scroll function
+  // Optimize scroll behavior
   const smoothScrollToTop = useCallback(() => {
     if (scrollContainerRef.current) {
-      const scrollContainer = scrollContainerRef.current;
-      const startPosition = scrollContainer.scrollTop;
-      const duration = 500; // ms
-      let start: number | null = null;
-
-      const animateScroll = (currentTime: number) => {
-        if (start === null) start = currentTime;
-        const timeElapsed = currentTime - start;
-        const progress = Math.min(timeElapsed / duration, 1);
-
-        // Easing function for smooth deceleration
-        const easeOutCubic = (x: number) => 1 - Math.pow(1 - x, 3);
-        
-        const position = startPosition * (1 - easeOutCubic(progress));
-        scrollContainer.scrollTop = position;
-
-        if (timeElapsed < duration) {
-          requestAnimationFrame(animateScroll);
-        }
-      };
-
-      requestAnimationFrame(animateScroll);
+      scrollContainerRef.current.scrollTo({
+        top: 0,
+        behavior: 'auto'
+      });
     }
   }, []);
 
-  const imageVariants = {
-    hidden: { 
-      opacity: 0,
-      y: 10,
-      scale: 0.98
-    },
-    visible: { 
-      opacity: 1,
-      y: 0,
-      scale: 1,
-      transition: { 
-        type: "spring",
-        stiffness: 500,
-        damping: 25,
-        mass: 0.5,
-        duration: 0.2
-      }
-    },
-    exit: { 
-      opacity: 0,
-      scale: 0.98,
-      transition: { 
-        duration: 0.15,
-        ease: "easeOut"
-      }
-    },
-    hover: {
-      scale: 1.02,
-      y: -2,
-      transition: {
-        type: "spring",
-        stiffness: 500,
-        damping: 25,
-        mass: 0.5
-      }
-    }
-  };
+  // Optimize image loading with intersection observer
+  const { ref: gridRef, inView } = useInView({
+    threshold: 0.1,
+    triggerOnce: false,
+    rootMargin: '100px'
+  });
 
-  const loadingVariants = {
-    initial: { 
-      opacity: 0,
-      scale: 0.98
-    },
-    animate: { 
-      opacity: 1,
-      scale: 1,
-      transition: {
-        duration: 0.2,
-        ease: [0.23, 1, 0.32, 1]
-      }
-    },
-    exit: { 
-      opacity: 0,
-      scale: 0.98,
-      transition: {
-        duration: 0.15
-      }
-    }
-  };
+  // Optimize load more images function
+  const loadMoreImages = useCallback(() => {
+    setIsLoadingMore(true);
+    setVisibleImages(prev => prev + 6);
+    requestAnimationFrame(() => {
+      setIsLoadingMore(false);
+    });
+  }, []);
 
   useEffect(() => {
     loadImageHistory();
@@ -300,18 +279,6 @@ function ImagineContent() {
     }
   };
 
-  const loadMoreImages = useCallback(() => {
-    setIsLoadingMore(true);
-    
-    // Use requestAnimationFrame for smoother transitions
-    requestAnimationFrame(() => {
-      setVisibleImages(prev => prev + 6);
-      setTimeout(() => {
-        setIsLoadingMore(false);
-      }, 300);
-    });
-  }, []);
-
   return (
     <div className="flex h-[100dvh] overflow-hidden bg-gradient-to-br from-purple-100 via-blue-100 to-pink-100">
       <Sidebar 
@@ -326,49 +293,27 @@ function ImagineContent() {
             bg-white/60 backdrop-blur-[12px] 
             rounded-2xl sm:rounded-[2rem] 
             border border-white/20 
-            shadow-[0_8px_40px_rgba(0,0,0,0.08)] 
+            shadow-lg
             relative flex flex-col overflow-hidden
             w-full max-w-[1400px] mx-auto
-            h-[calc(100dvh-20px)] sm:h-[calc(98dvh-16px)]
-            transition-all duration-500 ease-out">
+            h-[calc(100dvh-20px)] sm:h-[calc(98dvh-16px)]">
             
             <div className="absolute inset-0 rounded-[2rem] sm:rounded-[2.5rem]">
-              <motion.div 
-                className="absolute inset-0 rounded-[2rem] sm:rounded-[2.5rem] 
-                  bg-gradient-to-r from-blue-500/20 via-purple-500/20 to-pink-500/20 
-                  blur-2xl opacity-40"
-                animate={{
-                  backgroundPosition: ['0% 50%', '100% 50%', '0% 50%'],
-                }}
-                transition={{
-                  duration: 10,
-                  repeat: Infinity,
-                  ease: "linear"
-                }}
-              />
+              <div className="absolute inset-0 rounded-[2rem] sm:rounded-[2.5rem] 
+                bg-gradient-to-r from-blue-500/20 via-purple-500/20 to-pink-500/20 
+                blur-2xl opacity-40" />
             </div>
 
             <div 
               ref={scrollContainerRef}
               className="flex-1 overflow-y-auto overflow-x-hidden p-4 relative z-10
                 scrollbar-thin scrollbar-thumb-black/10 scrollbar-track-transparent
-                scroll-smooth overscroll-bounce"
-              style={{
-                scrollBehavior: 'smooth',
-                WebkitOverflowScrolling: 'touch'
-              }}
+                overscroll-bounce"
             >
               <LazyMotion features={domAnimation}>
                 <m.div 
                   ref={gridRef}
                   className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 max-w-7xl mx-auto"
-                  initial="hidden"
-                  animate="visible"
-                  exit="exit"
-                  transition={{
-                    staggerChildren: 0.05,
-                    delayChildren: 0.1
-                  }}
                 >
                   {isLoading && (
                     <m.div
@@ -381,66 +326,10 @@ function ImagineContent() {
                         flex items-center justify-center col-span-1 row-start-1"
                     >
                       <div className="absolute inset-0 flex flex-col items-center justify-center p-6">
-                        <motion.div
-                          animate={{ rotate: 360 }}
-                          transition={{ 
-                            duration: 2,
-                            repeat: Infinity,
-                            ease: "linear"
-                          }}
-                          className="mb-4"
-                        >
-                          <RefreshCw className="w-8 h-8 text-gray-400/80" />
-                        </motion.div>
-                        
-                        <div className="w-full max-w-[200px] h-1.5 bg-gray-200/30 rounded-full overflow-hidden">
-                          <motion.div
-                            initial={{ width: "0%" }}
-                            animate={{ 
-                              width: "100%",
-                            }}
-                            transition={{ 
-                              duration: 3,
-                              ease: "easeInOut",
-                              repeat: Infinity,
-                            }}
-                            className="h-full bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500 rounded-full"
-                          />
-                        </div>
-                        
-                        <motion.div
-                          initial={{ opacity: 0, y: 10 }}
-                          animate={{ opacity: 1, y: 0 }}
-                          transition={{ delay: 0.2 }}
-                          className="mt-4 text-sm text-gray-500 text-center font-medium"
-                        >
+                        <RefreshCw className="w-8 h-8 text-gray-400/80 animate-spin" />
+                        <div className="mt-4 text-sm text-gray-500 text-center font-medium">
                           Creating your masterpiece...
-                        </motion.div>
-
-                        <motion.div
-                          className="absolute inset-0 bg-gradient-to-r from-blue-500/10 via-purple-500/10 to-pink-500/10"
-                          animate={{
-                            opacity: [0.5, 0.8, 0.5],
-                            scale: [1, 1.02, 1],
-                          }}
-                          transition={{
-                            duration: 2,
-                            repeat: Infinity,
-                            ease: "easeInOut"
-                          }}
-                        />
-                        
-                        <motion.div 
-                          className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent"
-                          animate={{
-                            x: ['-100%', '100%'],
-                          }}
-                          transition={{
-                            duration: 1.5,
-                            repeat: Infinity,
-                            ease: "linear"
-                          }}
-                        />
+                        </div>
                       </div>
                     </m.div>
                   )}
@@ -457,13 +346,9 @@ function ImagineContent() {
                         layout="position"
                         layoutId={`image-${imageSession.id}`}
                         className="relative aspect-square rounded-2xl overflow-hidden
-                          shadow-lg hover:shadow-xl transition-all duration-200
+                          shadow-lg hover:shadow-xl 
                           bg-white/50 backdrop-blur-sm border border-white/20
-                          cursor-pointer group transform-gpu will-change-transform"
-                        style={{
-                          perspective: "1000px",
-                          backfaceVisibility: "hidden"
-                        }}
+                          cursor-pointer group transform-gpu"
                         onClick={() => {
                           setSelectedImage(imageSession.image_url);
                           setSelectedImagePrompt(imageSession.prompt);
@@ -473,29 +358,22 @@ function ImagineContent() {
                           src={imageSession.image_url}
                           alt={`History image ${index + 1}`}
                           fill
-                          priority={index < 6}
-                          className="object-cover transition-all duration-500
-                            group-hover:scale-[1.02] will-change-transform"
+                          priority={index < 4}
+                          className="object-cover"
                           sizes="(max-width: 768px) 50vw, (max-width: 1200px) 33vw, 25vw"
-                          loading={index < 12 ? "eager" : "lazy"}
-                          quality={index < 12 ? 90 : 75}
+                          loading={index < 8 ? "eager" : "lazy"}
+                          quality={index < 8 ? 85 : 75}
                         />
-                        <div className="absolute inset-0 bg-gradient-to-b from-transparent 
-                          via-transparent to-black/20 opacity-0 group-hover:opacity-100 
-                          transition-opacity duration-300" />
                         
                         <m.div 
                           className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 
-                            transition-all duration-300 transform translate-y-2 
-                            group-hover:translate-y-0"
-                          whileHover={{ scale: 1.05 }}
+                            transition-opacity duration-200"
                           whileTap={{ scale: 0.95 }}
                         >
                           <Button
                             variant="destructive"
                             size="icon"
-                            className="h-8 w-8 rounded-full bg-red-500/80 hover:bg-red-600 
-                              backdrop-blur-sm shadow-lg"
+                            className="h-8 w-8 rounded-full bg-red-500/80 hover:bg-red-600"
                             onClick={(e) => handleDeleteImage(imageSession.id, e)}
                           >
                             <Trash2 className="h-4 w-4 text-white" />
@@ -504,22 +382,18 @@ function ImagineContent() {
                       </m.div>
                     ))}
                   </AnimatePresence>
-                  {historyImages.length > visibleImages && (
+
+                  {historyImages.length > visibleImages && inView && (
                     <m.div
-                      initial={{ opacity: 0, y: 10 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ 
-                        duration: 0.2,
-                        ease: "easeOut"
-                      }}
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
                       className="col-span-full flex justify-center my-4"
                     >
                       <Button
                         variant="outline"
                         onClick={loadMoreImages}
                         disabled={isLoadingMore}
-                        className="bg-white/50 backdrop-blur-sm hover:bg-white/60 
-                          transition-all duration-300 rounded-xl"
+                        className="bg-white/50 backdrop-blur-sm hover:bg-white/60"
                       >
                         {isLoadingMore ? (
                           <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
@@ -532,166 +406,98 @@ function ImagineContent() {
               </LazyMotion>
             </div>
 
-            <div className="border-t border-white/10 bg-white/5 backdrop-blur-xl p-2 sm:p-4
-              transition-all duration-300">
+            <div className="border-t border-white/10 bg-white/5 p-2 sm:p-3">
               <form onSubmit={handleSubmit} className="max-w-2xl mx-auto">
-                <div className="relative group">
-                  <motion.div
-                    className="absolute -inset-1 bg-gradient-to-r from-purple-500/20 to-blue-500/20 
-                      rounded-[2rem] blur"
-                    initial={{ opacity: 0.5 }}
-                    animate={{ opacity: isEnhancing ? 1 : 0.75 }}
-                    whileHover={{ opacity: 1 }}
-                    transition={{ duration: 0.3 }}
-                  />
-                  <div className="relative rounded-[2.5rem] overflow-hidden 
-                    bg-white/10 backdrop-blur-md border border-white/20 
-                    shadow-lg group-hover:shadow-xl transition-all duration-300">
+                <div className="relative">
+                  <div className="absolute -inset-0.5 bg-gradient-to-r from-purple-500/10 via-blue-500/10 to-emerald-500/10 
+                    rounded-2xl blur opacity-75" />
+                  
+                  <div className="relative rounded-xl overflow-hidden 
+                    bg-white/10 dark:bg-gray-900/20
+                    border border-white/20 dark:border-white/10 
+                    shadow-[0_8px_16px_rgba(0,0,0,0.08)] dark:shadow-[0_8px_16px_rgba(0,0,0,0.2)]
+                    transition-shadow duration-300 hover:shadow-[0_12px_24px_rgba(0,0,0,0.12)] 
+                    dark:hover:shadow-[0_12px_24px_rgba(0,0,0,0.3)]">
                     
-                    <div className="flex items-center justify-center gap-2 px-6 pt-4 pb-2">
-                      <div className="flex items-center gap-2 max-w-fit">
+                    {/* Model Selectors Row */}
+                    <div className="flex items-center justify-between gap-2 px-3 pt-2 pb-1">
+                      <div className="flex items-center gap-1.5 flex-wrap">
                         <ImageTypeSelector onStyleChange={setSelectedStyle} />
                         <ModelSelector onModelChange={setSelectedModel} />
                         <SizeSelector onSizeChange={setSelectedSize} />
                       </div>
                     </div>
 
-                    <Textarea
-                      value={prompt}
-                      onChange={(e) => {
-                        setPrompt(e.target.value);
-                        e.target.style.height = 'inherit';
-                        const computed = window.getComputedStyle(e.target);
-                        const height = parseInt(computed.getPropertyValue('border-top-width'), 10)
-                                      + parseInt(computed.getPropertyValue('padding-top'), 10)
-                                      + e.target.scrollHeight
-                                      + parseInt(computed.getPropertyValue('padding-bottom'), 10)
-                                      + parseInt(computed.getPropertyValue('border-bottom-width'), 10);
+                    {/* Input Area */}
+                    <div className="relative">
+                      <Textarea
+                        value={prompt}
+                        onChange={(e) => {
+                          setPrompt(e.target.value);
+                          e.target.style.height = 'auto';
+                          e.target.style.height = `${Math.min(e.target.scrollHeight, 200)}px`;
+                        }}
+                        placeholder="Describe the image you want to generate..."
+                        className="w-full min-h-[45px] max-h-[200px] px-3 py-2
+                          bg-transparent border-0 focus:outline-none focus:ring-0
+                          placeholder:text-gray-400/70 dark:placeholder:text-gray-500/70
+                          text-gray-700 dark:text-gray-200 resize-none
+                          text-[0.925rem] focus:border-0
+                          [&:not(:focus)]:border-0 [&:not(:focus)]:ring-0
+                          focus-visible:ring-0 focus-visible:ring-offset-0"
+                      />
+                      
+                      {/* Subtle Separator */}
+                      <div className="h-px bg-gradient-to-r from-transparent via-white/10 to-transparent" />
+                    </div>
 
-                        e.target.style.height = `${Math.min(height, 200)}px`;
-                      }}
-                      placeholder="Describe the image you want to generate..."
-                      className="w-full min-h-[60px] max-h-[200px] px-6 py-4 text-base
-                        bg-transparent border-none focus:outline-none focus:ring-0
-                        placeholder:text-gray-400 resize-none selection:bg-blue-200/30
-                        [&:not(:focus)]:border-none [&:not(:focus)]:ring-0
-                        focus-visible:ring-0 focus-visible:ring-offset-0"
-                      style={{ 
-                        height: '60px',
-                        overflowY: 'auto'
-                      }}
-                    />
-                    
-                    <div className="flex items-center justify-center p-3 
-                      border-t border-white/10 bg-white/5">
-                      <div className="flex items-center gap-6 w-full max-w-2xl mx-auto px-4">
-                        <div className="flex-shrink-0">
-                          {/* <ImageOptionsMenu 
-                            onModelChange={setSelectedModel}
-                            onSizeChange={setSelectedSize}
-                            onStyleChange={setSelectedStyle}
-                          /> */}
-                        </div>
-                        
-                        <div className="flex items-center justify-center flex-grow gap-3">
-                          <motion.div
-                            whileHover={{ scale: 1.02 }}
-                            whileTap={{ scale: 0.98 }}
-                          >
-                            <Button
-                              type="button"
-                              variant="outline"
-                              size="sm"
-                              onClick={handleEnhancePrompt}
-                              disabled={!prompt.trim() || isEnhancing}
-                              className="flex items-center gap-2 rounded-xl relative overflow-hidden
-                                min-w-[100px] sm:min-w-[120px]"
-                            >
-                              <motion.div
-                                animate={{
-                                  rotate: isEnhancing ? 360 : 0
-                                }}
-                                transition={{
-                                  duration: 2,
-                                  repeat: isEnhancing ? Infinity : 0,
-                                  ease: "linear"
-                                }}
-                              >
-                                <Sparkles className="w-4 h-4" />
-                              </motion.div>
-                              <span className="hidden sm:inline">
-                                {isEnhancing ? "Enhancing..." : "Enhance"}
-                              </span>
-                              {isEnhancing && (
-                                <motion.div
-                                  className="absolute inset-0 bg-gradient-to-r from-purple-500/20 to-blue-500/20"
-                                  animate={{
-                                    x: ["0%", "100%"],
-                                  }}
-                                  transition={{
-                                    duration: 1,
-                                    repeat: Infinity,
-                                    ease: "linear"
-                                  }}
-                                />
-                              )}
-                            </Button>
-                          </motion.div>
-
-                          <motion.div
-                            whileHover={{ scale: 1.02 }}
-                            whileTap={{ scale: 0.98 }}
-                          >
-                            <Button 
-                              type="submit"
-                              disabled={!prompt.trim() || isLoading}
-                              className="rounded-xl bg-gradient-to-r from-purple-500 to-blue-500
-                                hover:from-purple-600 hover:to-blue-600 text-white
-                                shadow-lg hover:shadow-xl transition-all duration-300
-                                transform hover:-translate-y-0.5 hover:scale-105
-                                px-4 py-2 text-sm font-medium relative overflow-hidden
-                                min-w-[120px] sm:min-w-[140px]"
-                            >
-                              <div className="flex items-center justify-center gap-2">
-                                <motion.div
-                                  animate={{
-                                    rotate: isLoading ? 360 : 0
-                                  }}
-                                  transition={{
-                                    duration: 2,
-                                    repeat: isLoading ? Infinity : 0,
-                                    ease: "linear"
-                                  }}
-                                >
-                                  {isLoading ? (
-                                    <RefreshCw className="w-4 h-4" />
-                                  ) : (
-                                    <Send className="w-4 h-4" />
-                                  )}
-                                </motion.div>
-                                <span>
-                                  {isLoading ? "Generating..." : "Generate"}
-                                </span>
-                              </div>
-                              {isLoading && (
-                                <motion.div
-                                  className="absolute inset-0 bg-gradient-to-r from-purple-500/20 to-blue-500/20"
-                                  animate={{
-                                    x: ["0%", "100%"],
-                                  }}
-                                  transition={{
-                                    duration: 1,
-                                    repeat: Infinity,
-                                    ease: "linear"
-                                  }}
-                                />
-                              )}
-                            </Button>
-                          </motion.div>
-                        </div>
-                        
-                        <div className="flex-shrink-0 w-8"></div>
+                    {/* Action Buttons */}
+                    <div className="flex items-center justify-between px-3 py-1.5 
+                      bg-gradient-to-b from-transparent to-black/[0.02] dark:to-white/[0.02]">
+                      <div className="flex items-center gap-2">
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          onClick={handleEnhancePrompt}
+                          disabled={!prompt.trim() || isEnhancing}
+                          className="h-8 px-3 text-xs font-medium
+                            bg-white/5 hover:bg-white/10 
+                            dark:bg-white/5 dark:hover:bg-white/10
+                            text-gray-700 dark:text-gray-200
+                            border border-white/10 rounded-lg
+                            transition-colors duration-200"
+                        >
+                          {isEnhancing ? (
+                            <RefreshCw className="w-3.5 h-3.5 mr-1.5 animate-spin" />
+                          ) : (
+                            <Sparkles className="w-3.5 h-3.5 mr-1.5" />
+                          )}
+                          <span>{isEnhancing ? "Enhancing..." : "Enhance"}</span>
+                        </Button>
                       </div>
+
+                      <Button 
+                        type="submit"
+                        disabled={!prompt.trim() || isLoading}
+                        className="h-8 px-4 text-xs font-medium
+                          bg-gradient-to-r from-purple-500 via-blue-500 to-emerald-500
+                          hover:from-purple-600 hover:via-blue-600 hover:to-emerald-600
+                          disabled:from-gray-400 disabled:to-gray-500
+                          text-white rounded-lg
+                          shadow-lg hover:shadow-xl
+                          transition-all duration-300
+                          disabled:shadow-none disabled:opacity-70"
+                      >
+                        <div className="flex items-center gap-1.5">
+                          {isLoading ? (
+                            <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                          ) : (
+                            <Send className="w-3.5 h-3.5" />
+                          )}
+                          <span>{isLoading ? "Generating..." : "Generate"}</span>
+                        </div>
+                      </Button>
                     </div>
                   </div>
                 </div>
@@ -700,7 +506,7 @@ function ImagineContent() {
           </Card>
         </div>
       </main>
-      <AnimatePresence>
+      <AnimatePresence mode="wait">
         {selectedImage && (
           <ImagePreview
             src={selectedImage}

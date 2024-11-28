@@ -69,7 +69,7 @@ const DocumentAIContent: React.FC = () => {
     },
     {
       id: 'translate',
-      title: 'Document Translation',
+      title: 'Doc Translation',
       description: 'Translate your document to another language',
       icon: <Languages className="w-6 h-6 text-green-500" />,
       action: () => {
@@ -78,7 +78,7 @@ const DocumentAIContent: React.FC = () => {
     },
     {
       id: 'compare',
-      title: 'Content Comparison',
+      title: 'Comparison',
       description: 'Compare different sections of your document',
       icon: <GitCompare className="w-6 h-6 text-orange-500" />,
       action: () => {

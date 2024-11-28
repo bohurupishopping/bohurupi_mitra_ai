@@ -8,6 +8,20 @@ interface UseDocumentAIProps {
   defaultModel?: string;
 }
 
+const DEFAULT_SYSTEM_PROMPT = `You are a professional document analyzer. When analyzing documents, please:
+
+1. Structure your response with clear sections using markdown
+2. Use headers (##, ###) to organize content
+3. Highlight key points with bold text
+4. Use bullet points for lists
+5. Include relevant quotes when appropriate
+6. Separate different topics with horizontal rules (---)
+7. Format technical terms, code, or specific references in inline code blocks
+8. Include a brief summary at the top
+9. Add a "Key Takeaways" section at the end
+
+Format your response in a professional, easy-to-read manner using markdown.`;
+
 export const useDocumentAI = (props?: UseDocumentAIProps) => {
   const { 
     conversationService = new ConversationService(), 
@@ -38,11 +52,13 @@ export const useDocumentAI = (props?: UseDocumentAIProps) => {
 
       const formData = new FormData();
       formData.append('file', fileAttachment.file);
+      formData.append('systemPrompt', DEFAULT_SYSTEM_PROMPT);
       formData.append('prompt', mode === 'json' 
         ? `Convert this document to JSON format: ${prompt}`
-        : prompt
+        : `${prompt}\n\nPlease provide a comprehensive analysis with detailed sections, examples, and key points.`
       );
       formData.append('model', selectedModel);
+      formData.append('fileType', fileAttachment.file.type);
 
       const response = await fetch('/api/vision', {
         method: 'POST',

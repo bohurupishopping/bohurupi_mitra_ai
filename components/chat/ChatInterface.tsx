@@ -93,32 +93,26 @@ const stripHtmlAndFormatText = (html: string): string => {
 const messageContainerStyles = `flex-1 overflow-y-auto
   scrollbar-thin scrollbar-thumb-black/10 dark:scrollbar-thumb-white/10
   scrollbar-track-transparent 
-  hover:scrollbar-thumb-black/20 dark:hover:scrollbar-thumb-white/20
-  motion-safe:transition-colors motion-safe:duration-200 
-  scroll-smooth overscroll-y-contain momentum-scroll
-  [-webkit-overflow-scrolling:touch]
-  [scroll-behavior:smooth]
-  will-change-scroll
   px-2 sm:px-4 py-2 sm:py-4 
   space-y-2.5 sm:space-y-3.5 
-  relative z-10`;
+  relative z-10
+  overscroll-y-contain
+  will-change-scroll`;
 
 // Update the message styles with enhanced glassmorphism
 const messageStyles = {
-  user: `bg-gradient-to-br from-blue-500/90 to-blue-600/90 
+  user: `bg-blue-500/90 
     text-[0.925rem] sm:text-base leading-relaxed
-    shadow-lg hover:shadow-xl transition-all duration-300
-    text-white/95 backdrop-blur-md
+    shadow-sm
+    text-white/95 
     border border-blue-400/30
-    dark:from-blue-600/80 dark:to-blue-700/80 
+    dark:bg-blue-600/90 
     dark:border-blue-500/20`,
-  assistant: `bg-white/50 backdrop-blur-xl 
+  assistant: `bg-white/50  
     text-[0.925rem] sm:text-base leading-relaxed
     border border-white/30 text-gray-800
-    shadow-sm hover:shadow-md transition-all duration-300
-    dark:bg-white/10 dark:border-white/10 dark:text-gray-100
-    hover:bg-white/60 dark:hover:bg-white/15
-    motion-safe:transition-[background,border,shadow] motion-safe:duration-300`
+    shadow-sm
+    dark:bg-white/10 dark:border-white/10 dark:text-gray-100`
 };
 
 // Update the typing effect utilities
@@ -130,65 +124,42 @@ const typeText = async (
   let partial = '';
   const tokens = text.split(/(\s+|\n|#{1,3}\s|`{1,3}|\*{1,2}|>|-)/).filter(Boolean);
   let buffer = '';
-  let lastUpdate = performance.now();
-  const updateThreshold = 1000 / 120; // 120fps for ultra-smooth updates
-
+  
   const processChunk = async (startIndex: number, chunkSize: number): Promise<void> => {
     const endIndex = Math.min(startIndex + chunkSize, tokens.length);
     
     for (let i = startIndex; i < endIndex; i++) {
-      const token = tokens[i];
-      partial += token;
-      buffer += token;
-      
-      const now = performance.now();
-      if (now - lastUpdate >= updateThreshold) {
-        await new Promise(resolve => requestAnimationFrame(resolve));
-        callback(partial);
-        buffer = '';
-        lastUpdate = now;
-      }
+      partial += tokens[i];
+      buffer += tokens[i];
     }
 
+    callback(partial);
+
     if (endIndex < tokens.length) {
-      await new Promise(resolve => setTimeout(resolve, 0));
+      await new Promise(resolve => setTimeout(resolve, 16)); // ~60fps
       return processChunk(endIndex, chunkSize);
     }
   };
 
-  await processChunk(0, 5); // Process 5 tokens at a time for better performance
-  
-  if (buffer) {
-    callback(partial);
-  }
+  await processChunk(0, 3);
+  callback(partial);
 };
 
-// Update the message animation for smoother transitions
+// Update the message animation for better performance
 const messageAnimation = {
   initial: { 
-    opacity: 0, 
-    y: 10, 
-    scale: 0.98 
+    opacity: 0,
   },
   animate: { 
-    opacity: 1, 
-    y: 0, 
-    scale: 1,
+    opacity: 1,
     transition: {
-      type: "spring",
-      stiffness: 500,
-      damping: 30,
-      mass: 0.8,
-      velocity: 2
+      duration: 0.15,
     }
   },
   exit: { 
-    opacity: 0, 
-    y: -10, 
-    scale: 0.98,
+    opacity: 0,
     transition: {
-      duration: 0.2,
-      ease: "easeOut"
+      duration: 0.1,
     }
   }
 } as const;
@@ -253,14 +224,13 @@ function ChatInterface({ defaultMessage, sessionId, onModelChange }: ChatInterfa
   useEffect(() => {
     if (messagesEndRef.current) {
       const scrollOptions: ScrollIntoViewOptions = {
-        behavior: 'smooth',
+        behavior: 'auto',
         block: 'end',
       };
       
-      // Add a small delay to ensure smooth scrolling after content renders
-      setTimeout(() => {
+      requestAnimationFrame(() => {
         messagesEndRef.current?.scrollIntoView(scrollOptions);
-      }, 100);
+      });
     }
   }, [messages]);
 
@@ -471,8 +441,8 @@ function ChatInterface({ defaultMessage, sessionId, onModelChange }: ChatInterfa
     }
   };
 
-  // Update the MessageContent component
-  const MessageContent = ({ message }: { message: Message }) => {
+  // Optimize message rendering
+  const MessageContent = React.memo(({ message }: { message: Message }) => {
     const hasAttachments = message.attachments && message.attachments.length > 0;
     const fileType = message.fileType;
 
@@ -504,7 +474,7 @@ function ChatInterface({ defaultMessage, sessionId, onModelChange }: ChatInterfa
         </ReactMarkdown>
       </div>
     );
-  };
+  });
 
   return (
     <div className="h-[100dvh] flex flex-col overflow-hidden 
@@ -512,22 +482,20 @@ function ChatInterface({ defaultMessage, sessionId, onModelChange }: ChatInterfa
       w-full max-w-[1600px] mx-auto">
       <Card className="flex-1 mx-0.5 my-0.5 sm:m-2 
         bg-white/40 dark:bg-gray-900/40 
-        backdrop-blur-[20px] 
+        backdrop-blur-[12px] 
         rounded-2xl sm:rounded-[2rem] 
         border border-white/20 dark:border-white/10 
-        shadow-[0_8px_40px_rgba(0,0,0,0.08)] dark:shadow-[0_8px_40px_rgba(0,0,0,0.2)]
+        shadow-lg
         relative flex flex-col overflow-hidden
         w-full max-w-[1400px] mx-auto
         h-[calc(100dvh-20px)] sm:h-[calc(98dvh-16px)]
-        motion-safe:transition-all motion-safe:duration-300">
+        transform-gpu">
         
-        <div className="absolute inset-0 rounded-[2rem] sm:rounded-[2.5rem]">
-          <div className="absolute inset-0 rounded-[2rem] sm:rounded-[2.5rem] 
-            bg-gradient-to-r from-blue-500/10 via-purple-500/10 to-pink-500/10 
-            dark:from-blue-400/20 dark:via-purple-400/20 dark:to-pink-400/20
-            blur-2xl opacity-50 animate-gradient-x
-            motion-safe:transition-opacity motion-safe:duration-500">
-          </div>
+        <div className="absolute inset-0 rounded-[2rem] sm:rounded-[2.5rem]
+          bg-gradient-to-r from-blue-500/10 via-purple-500/10 to-pink-500/10 
+          dark:from-blue-400/20 dark:via-purple-400/20 dark:to-pink-400/20
+          opacity-50
+          pointer-events-none">
         </div>
 
         <CardHeader 
@@ -659,14 +627,14 @@ function ChatInterface({ defaultMessage, sessionId, onModelChange }: ChatInterfa
           )}
           
           <div className={messageContainerStyles}>
-            <AnimatePresence mode="popLayout">
+            <AnimatePresence initial={false}>
               {(searchQuery ? filteredMessages : messages).map((message, index) => (
                 <motion.div
                   key={index}
                   {...messageAnimation}
                   className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'} 
-                    transform-gpu will-change-transform
-                    group/message`}
+                    transform-gpu will-change-transform`}
+                  layout={false}
                 >
                   <div className={`flex items-start space-x-1.5 sm:space-x-2 
                     max-w-[88%] sm:max-w-[80%] lg:max-w-[75%]
@@ -732,30 +700,28 @@ function ChatInterface({ defaultMessage, sessionId, onModelChange }: ChatInterfa
             
             {isTyping && (
               <motion.div
-                initial={{ opacity: 0, y: 10, scale: 0.98 }}
-                animate={{ opacity: 1, y: 0, scale: 1 }}
-                exit={{ opacity: 0, y: -10, scale: 0.98 }}
-                transition={{ type: "spring", stiffness: 500, damping: 30 }}
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.2 }}
                 className="flex justify-start"
               >
                 <div className="flex items-center space-x-2 px-4 py-3 rounded-xl 
-                  bg-white/60 backdrop-blur-xl border border-white/30
-                  shadow-sm transition-all duration-300">
-                  <motion.div
-                    animate={{ scale: [1, 1.2, 1] }}
-                    transition={{ repeat: Infinity, duration: 0.8, repeatDelay: 0.1 }}
-                    className="w-2 h-2 bg-blue-500/80 rounded-full"
-                  />
-                  <motion.div
-                    animate={{ scale: [1, 1.2, 1] }}
-                    transition={{ repeat: Infinity, duration: 0.8, delay: 0.2, repeatDelay: 0.1 }}
-                    className="w-2 h-2 bg-blue-500/80 rounded-full"
-                  />
-                  <motion.div
-                    animate={{ scale: [1, 1.2, 1] }}
-                    transition={{ repeat: Infinity, duration: 0.8, delay: 0.4, repeatDelay: 0.1 }}
-                    className="w-2 h-2 bg-blue-500/80 rounded-full"
-                  />
+                  bg-white/60 backdrop-blur-[8px] border border-white/30
+                  shadow-sm">
+                  {[0, 1, 2].map((i) => (
+                    <motion.div
+                      key={i}
+                      animate={{ scale: [1, 1.2, 1] }}
+                      transition={{ 
+                        repeat: Infinity, 
+                        duration: 1,
+                        delay: i * 0.2,
+                        ease: "easeInOut"
+                      }}
+                      className="w-2 h-2 bg-blue-500/80 rounded-full"
+                    />
+                  ))}
                 </div>
               </motion.div>
             )}
@@ -763,22 +729,23 @@ function ChatInterface({ defaultMessage, sessionId, onModelChange }: ChatInterfa
             <div ref={messagesEndRef} className="scroll-mt-[100px]" />
           </div>
 
-          <div className="border-t border-white/10 bg-transparent p-2 sm:p-4">
+          <div className="border-t border-white/10 bg-transparent p-1 sm:p-2">
             <div className="max-w-2xl mx-auto">
-              <form onSubmit={handleSubmit} className="space-y-4">
+              <form onSubmit={handleSubmit} className="space-y-2">
                 <div className="relative group">
-                  <div className="absolute -inset-1 bg-gradient-to-r from-blue-500/10 via-purple-500/10 to-pink-500/10 
-                    dark:from-blue-400/20 dark:via-purple-400/20 dark:to-pink-400/20
-                    rounded-[1.75rem] blur-xl opacity-70 group-hover:opacity-100 
-                    motion-safe:transition-all motion-safe:duration-500">
+                  <div className="absolute -inset-1 bg-gradient-to-r from-green-400/20 via-emerald-400/20 to-teal-400/20 
+                    dark:from-green-300/30 dark:via-emerald-300/30 dark:to-teal-300/30
+                    rounded-[1.5rem] blur-xl opacity-70 group-hover:opacity-100 
+                    transition-all duration-500">
                   </div>
-                  <div className="relative rounded-[1.75rem] overflow-hidden 
-                    bg-white/10 dark:bg-gray-900/10 backdrop-blur-xl 
-                    border border-white/20 dark:border-white/10 
+                  <div className="relative rounded-[1.5rem] overflow-hidden 
+                    bg-gradient-to-br from-green-50/90 to-emerald-50/90
+                    dark:from-green-900/20 dark:to-emerald-900/20 backdrop-blur-xl 
+                    border border-green-100/20 dark:border-green-400/10 
                     shadow-lg hover:shadow-xl 
-                    motion-safe:transition-all motion-safe:duration-300">
+                    transition-all duration-300">
                     
-                    <div className="absolute top-3 left-1/2 transform -translate-x-1/2 z-10">
+                    <div className="absolute top-1.5 left-1/2 transform -translate-x-1/2 z-10">
                       <ModelSelector 
                         onModelChange={handleModelChange}
                         compact={true}
@@ -787,36 +754,63 @@ function ChatInterface({ defaultMessage, sessionId, onModelChange }: ChatInterfa
                     </div>
 
                     {attachments.length > 0 && (
-                      <div className="flex flex-wrap gap-2 p-3 border-b border-white/10
-                        bg-white/5 dark:bg-gray-900/5 backdrop-blur-sm">
+                      <div className="flex flex-wrap items-center gap-2 px-3 py-1 mt-[2.75rem] border-b border-green-100/20
+                        bg-white/5 dark:bg-gray-900/5 backdrop-blur-sm
+                        h-[38px] overflow-y-auto
+                        scrollbar-thin scrollbar-thumb-green-200/30 dark:scrollbar-thumb-green-400/10
+                        scrollbar-track-transparent">
                         {attachments.map((attachment) => (
-                          <div key={attachment.id} className="relative group/attachment">
+                          <div key={attachment.id} 
+                            className="relative group/attachment 
+                              flex items-center h-[28px]
+                              flex-shrink-0 transform hover:scale-105 
+                              transition-all duration-200">
                             {attachment.type === 'image' && attachment.preview && (
-                              <img 
-                                src={attachment.preview} 
-                                alt="Attachment preview" 
-                                className="w-16 h-16 object-cover rounded-lg"
-                              />
+                              <div className="relative w-[28px] h-[28px]">
+                                <img 
+                                  src={attachment.preview} 
+                                  alt="Attachment preview" 
+                                  className="w-full h-full object-cover rounded-md
+                                    ring-1 ring-green-100/30 dark:ring-green-400/20
+                                    shadow-sm"
+                                />
+                              </div>
                             )}
                             {attachment.type === 'document' && (
-                              <div className="w-16 h-16 bg-gray-100 rounded-lg flex items-center justify-center">
-                                <File className="w-8 h-8 text-gray-400" />
+                              <div className="w-[28px] h-[28px]
+                                bg-white/80 dark:bg-gray-800/80 
+                                rounded-md flex items-center justify-center
+                                ring-1 ring-green-100/30 dark:ring-green-400/20
+                                shadow-sm">
+                                <File className="w-4 h-4 text-gray-400 dark:text-gray-500" />
                               </div>
                             )}
                             {attachment.uploading && (
-                              <div className="absolute inset-0 bg-black/50 rounded-lg flex items-center justify-center">
-                                <RefreshCw className="w-6 h-6 text-white animate-spin" />
+                              <div className="absolute inset-0 bg-black/50 rounded-md 
+                                flex items-center justify-center backdrop-blur-sm">
+                                <RefreshCw className="w-3 h-3 text-white animate-spin" />
                               </div>
                             )}
                             <button
                               type="button"
                               onClick={() => removeAttachment(attachment.id)}
-                              className="absolute -top-1 -right-1 bg-red-500 text-white rounded-full p-0.5 opacity-0 group-hover/attachment:opacity-100 transition-opacity"
+                              className="absolute -top-1 -right-1 
+                                bg-red-500/90 hover:bg-red-500
+                                text-white rounded-full p-0.5
+                                opacity-0 scale-75
+                                group-hover/attachment:opacity-100 
+                                group-hover/attachment:scale-100
+                                shadow-sm hover:shadow-md
+                                transition-all duration-200
+                                z-10"
                             >
-                              <X className="w-3 h-3" />
+                              <X className="w-2.5 h-2.5" />
                             </button>
                           </div>
                         ))}
+                        <div className="text-xs text-gray-500/80 dark:text-gray-400/80 ml-1">
+                          {attachments.length} {attachments.length === 1 ? 'file' : 'files'}
+                        </div>
                       </div>
                     )}
 
@@ -825,8 +819,10 @@ function ChatInterface({ defaultMessage, sessionId, onModelChange }: ChatInterfa
                       value={prompt}
                       onChange={(e) => {
                         setPrompt(e.target.value);
+                        // Reset height first to get accurate scrollHeight
                         e.target.style.height = 'auto';
-                        e.target.style.height = Math.min(e.target.scrollHeight, 200) + 'px';
+                        const scrollHeight = Math.max(45, e.target.scrollHeight); // Minimum height of 45px
+                        e.target.style.height = `${Math.min(scrollHeight, 300)}px`; // Max height of 300px
                       }}
                       onKeyDown={(e) => {
                         if (e.key === 'Enter' && !e.shiftKey) {
@@ -835,51 +831,49 @@ function ChatInterface({ defaultMessage, sessionId, onModelChange }: ChatInterfa
                         }
                       }}
                       placeholder="Type a message..."
-                      className="w-full min-h-[60px] max-h-[200px] px-6 py-4 pt-[4.5rem]
+                      className="w-full min-h-[45px] max-h-[300px] px-4 py-2.5
+                        mt-[2.75rem] 
                         bg-transparent border-none focus:outline-none focus:ring-0
-                        placeholder:text-gray-400/70 resize-none selection:bg-blue-200/30
+                        placeholder:text-gray-400/70 resize-none selection:bg-green-200/30
                         [&:not(:focus)]:border-none [&:not(:focus)]:ring-0
                         focus-visible:ring-0 focus-visible:ring-offset-0
-                        text-gray-700 dark:text-gray-200"
+                        text-gray-700 dark:text-gray-200
+                        overflow-y-auto scrollbar-thin scrollbar-thumb-green-200/30 
+                        dark:scrollbar-thumb-green-400/10 scrollbar-track-transparent"
                       style={{ 
-                        height: 'auto',
-                        overflowY: 'auto',
+                        height: '45px', // Initial height
                         lineHeight: '1.5'
                       }}
                     />
                     
-                    <div className="flex items-center justify-center p-2 sm:p-3 
-                      border-t border-white/10 bg-gradient-to-b from-transparent to-white/5 
-                      dark:to-gray-900/5 backdrop-blur-sm">
-                      <div className="flex items-center justify-center gap-3">
+                    <div className="flex items-center justify-center p-1 sm:p-1.5 
+                      border-t border-green-100/20 bg-gradient-to-b from-transparent to-green-50/5 
+                      dark:to-green-900/5 backdrop-blur-sm">
+                      <div className="flex items-center justify-center w-full gap-3">
                         <Button
                           type="button"
                           variant="ghost"
                           size="sm"
                           onClick={() => fileInputRef.current?.click()}
-                          className="rounded-xl bg-white/10 hover:bg-white/20 
-                            dark:bg-gray-900/20 dark:hover:bg-gray-900/30
-                            transition-all duration-300 backdrop-blur-sm
-                            flex items-center gap-2 text-sm group/attach
-                            border border-white/10 dark:border-white/5
-                            shadow-sm hover:shadow-md"
+                          className="rounded-xl bg-green-100/30
+                            dark:bg-green-900/20
+                            flex items-center gap-2 text-sm
+                            border border-green-100/20 dark:border-green-400/10
+                            shadow-sm h-9 px-4
+                            text-gray-700 dark:text-gray-200"
                         >
-                          <ImageIcon className="w-4 h-4 group-hover/attach:scale-110 
-                            transition-transform duration-300" />
-                          <span className="hidden sm:inline">Attach</span>
+                          <ImageIcon className="w-4 h-4" />
+                          <span>Attach</span>
                         </Button>
 
                         <Button 
                           type="submit"
                           disabled={!prompt.trim() && attachments.length === 0 || isLoading}
-                          className="rounded-xl bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500
-                            hover:from-blue-600 hover:via-purple-600 hover:to-pink-600 
+                          className="rounded-xl bg-gradient-to-r from-green-400 via-emerald-400 to-teal-400
                             disabled:from-gray-400 disabled:to-gray-500
-                            text-white font-medium
-                            shadow-lg hover:shadow-xl transition-all duration-300
-                            transform hover:-translate-y-0.5 hover:scale-[1.02]
-                            px-4 sm:px-6 py-2 text-sm
-                            border border-white/10 backdrop-blur-sm"
+                            text-white font-medium shadow-lg
+                            h-9 px-4 text-sm
+                            border border-green-100/20"
                         >
                           <div className="flex items-center gap-2">
                             {isLoading ? (
@@ -887,7 +881,7 @@ function ChatInterface({ defaultMessage, sessionId, onModelChange }: ChatInterfa
                             ) : (
                               <Send className="w-4 h-4" />
                             )}
-                            <span className="text-xs sm:text-sm">
+                            <span>
                               {isLoading ? "Sending..." : "Send"}
                             </span>
                           </div>
@@ -940,4 +934,5 @@ function ChatInterface({ defaultMessage, sessionId, onModelChange }: ChatInterfa
   );
 }
 
+// Memoize the entire component
 export default React.memo(ChatInterface);

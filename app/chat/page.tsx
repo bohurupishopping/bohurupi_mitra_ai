@@ -15,7 +15,10 @@ function ChatContent() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
 
   return (
-    <div className="flex h-[100dvh] overflow-hidden bg-gradient-to-br from-blue-50 via-purple-50/50 to-pink-50/50">
+    <div className="flex h-[100dvh] overflow-hidden bg-gradient-to-br 
+      from-sky-50 via-indigo-50 to-emerald-50 
+      dark:from-gray-900 dark:via-purple-900 dark:to-gray-900
+      transform-gpu">
       <Sidebar 
         isOpen={isSidebarOpen} 
         onToggle={() => setIsSidebarOpen(!isSidebarOpen)} 
@@ -33,7 +36,10 @@ function ChatContent() {
 // Create a loading component
 function LoadingChat() {
   return (
-    <div className="flex h-[100dvh] items-center justify-center bg-gradient-to-br from-blue-50 via-purple-50/50 to-pink-50/50">
+    <div className="flex h-[100dvh] items-center justify-center bg-gradient-to-br 
+      from-sky-50 via-indigo-50 to-emerald-50 
+      dark:from-gray-900 dark:via-purple-900 dark:to-gray-900
+      transform-gpu">
       <div className="animate-pulse text-gray-500">Loading chat...</div>
     </div>
   );

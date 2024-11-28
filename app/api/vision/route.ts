@@ -32,6 +32,36 @@ const SUPPORTED_IMAGE_TYPES = [
   'image/webp'
 ];
 
+const generatePromptByFileType = (fileType: string, userPrompt: string) => {
+  const basePrompt = `Please analyze this ${fileType} document and provide a detailed response following this structure:
+
+## Summary
+[Provide a brief overview]
+
+## Detailed Analysis
+[Main content broken into relevant sections]
+
+## Key Points
+- [Important point 1]
+- [Important point 2]
+- [etc...]
+
+## Technical Details
+[If applicable, include technical specifications, code analysis, or data points]
+
+## Recommendations
+[If applicable, provide actionable insights or suggestions]
+
+## Key Takeaways
+[Summarize 3-5 main takeaways]
+
+Specific request: ${userPrompt}
+
+Please format the response using markdown with appropriate headers, bullet points, bold text, and code blocks where relevant.`;
+
+  return basePrompt;
+};
+
 export async function POST(req: NextRequest) {
   let tempFilePath: string | null = null;
   
@@ -39,7 +69,9 @@ export async function POST(req: NextRequest) {
     const formData = await req.formData();
     const file = formData.get('file') as File;
     const prompt = formData.get('prompt') as string;
+    const systemPrompt = formData.get('systemPrompt') as string;
     const model = formData.get('model') as string;
+    const fileType = formData.get('fileType') as string;
 
     if (!file) {
       return NextResponse.json(
@@ -69,27 +101,23 @@ export async function POST(req: NextRequest) {
       displayName: file.name,
     });
 
-    // Initialize Gemini model with appropriate configuration
+    // Initialize Gemini model with enhanced configuration
     const geminiModel = genAI.getGenerativeModel({ 
       model: model || "gemini-1.5-flash",
       generationConfig: {
         temperature: 0.7,
-        topP: 0.8,
+        topP: 0.9,
         topK: 40,
+        maxOutputTokens: 4096,
       }
     });
 
     const isDocument = SUPPORTED_DOC_TYPES.includes(file.type);
-    let defaultPrompt = isDocument 
-      ? `Please analyze this ${file.type} document and provide a detailed summary.` 
-      : "Describe this image in detail.";
-
-    if (prompt) {
-      defaultPrompt = `${defaultPrompt}\n\nSpecific request: ${prompt}`;
-    }
+    const enhancedPrompt = generatePromptByFileType(fileType, prompt);
 
     const result = await geminiModel.generateContent([
-      defaultPrompt,
+      { text: systemPrompt },
+      { text: enhancedPrompt },
       {
         fileData: {
           fileUri: uploadResult.file.uri,
@@ -99,13 +127,20 @@ export async function POST(req: NextRequest) {
     ]);
 
     const response = await result.response;
-    const text = response.text();
+    let formattedText = response.text();
+
+    // Ensure proper markdown formatting
+    formattedText = formattedText
+      .replace(/^#(?!#)/gm, '##') // Ensure headers start at level 2
+      .replace(/(\*\*.*?\*\*)/g, '$1\n') // Add newline after bold text
+      .replace(/^[-*]\s/gm, '\n- ') // Ensure proper bullet point formatting
+      .replace(/\n{3,}/g, '\n\n'); // Remove excessive newlines
 
     // Clean up the uploaded file from Google AI
     await fileManager.deleteFile(uploadResult.file.name);
 
     return NextResponse.json({
-      result: text,
+      result: formattedText,
       fileType: isDocument ? 'document' : 'image'
     });
 

@@ -1,4 +1,7 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
+import { createServerComponentClient } from "@supabase/auth-helpers-nextjs";
+import { cookies } from "next/headers";
 import { ModeToggle } from "@/components/mode-toggle";
 import { Button } from "@/components/ui/button";
 import { AnimatedSections } from "@/components/home/animated-sections";
@@ -31,7 +34,18 @@ export const metadata = {
   },
 };
 
-export default function Home() {
+export default async function Home() {
+  // Initialize Supabase client
+  const supabase = createServerComponentClient({ cookies });
+  
+  // Check authentication status
+  const { data: { session } } = await supabase.auth.getSession();
+  
+  // Redirect if user is authenticated
+  if (session) {
+    redirect('/chat');
+  }
+
   return (
     <div className="min-h-screen flex flex-col">
       {/* Navigation Header */}

@@ -203,31 +203,41 @@ Please provide an appropriate response.` : newPrompt;
           formData.append('file', fileAttachment.file);
           formData.append('prompt', prompt);
           formData.append('model', selectedModel);
+          formData.append('systemPrompt', 'You are FeludaAI, an intelligent assistant. Analyze this file and provide a detailed response.');
+          formData.append('fileType', fileAttachment.type);
 
-          const response = await fetch('/api/vision', {
-            method: 'POST',
-            body: formData,
-          });
+          try {
+            const response = await fetch('/api/vision', {
+              method: 'POST',
+              body: formData,
+            });
 
-          if (!response.ok) {
-            const errorData = await response.json();
-            throw new Error(errorData.error || 'Failed to generate content');
+            if (!response.ok) {
+              const errorData = await response.json();
+              throw new Error(errorData.error || 'Failed to process file');
+            }
+
+            const data = await response.json();
+            
+            if (!data.result) {
+              throw new Error('No content generated');
+            }
+
+            // Save conversation with just prompt and response
+            await conversationService.saveConversation(
+              prompt, 
+              `${fileAttachment.type === 'image' ? '[Image Analysis] ' : '[Document Analysis] '}${data.result}`
+            );
+            
+            setGeneratedContent(data.result);
+            return {
+              content: data.result,
+              fileType: data.fileType || fileAttachment.type
+            };
+          } catch (error) {
+            console.error('Vision API error:', error);
+            throw new Error(`Vision API error: ${error instanceof Error ? error.message : 'Unknown error'}`);
           }
-
-          const data = await response.json();
-          
-          if (!data.result) {
-            throw new Error('No content generated');
-          }
-
-          // Save conversation with file type metadata
-          await conversationService.saveConversation(prompt, data.result);
-          
-          setGeneratedContent(data.result);
-          return {
-            content: data.result,
-            fileType: data.fileType
-          };
         }
       }
 
@@ -362,12 +372,12 @@ Please provide an appropriate response.` : newPrompt;
       console.error('Content generation error:', error);
       toast({
         title: 'Generation Error',
-        description: `Failed to generate content: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        description: error instanceof Error ? error.message : 'Failed to generate content',
         variant: 'destructive'
       });
       return null;
     }
-  }, [selectedModel, toast, conversationService]);
+  }, [selectedModel, conversationService, setGeneratedContent, toast]);
 
   // Persist model selection in localStorage
   const handleModelChange = (model: string) => {

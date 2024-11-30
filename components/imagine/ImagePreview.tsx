@@ -1,9 +1,10 @@
 import { useState, useRef, useEffect } from 'react';
 import Image from 'next/image';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Download, ZoomIn, ZoomOut, Copy, Check } from 'lucide-react';
+import { X, Download, ZoomIn, ZoomOut, Copy, Check, Maximize2, Minimize2, Share2 } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/components/ui/use-toast";
+import { cn } from "@/lib/utils";
 
 interface ImagePreviewProps {
   src: string;
@@ -18,8 +19,38 @@ export default function ImagePreview({ src, alt, prompt, onClose }: ImagePreview
   const [scale, setScale] = useState(1);
   const [position, setPosition] = useState({ x: 0, y: 0 });
   const [isDragging, setIsDragging] = useState(false);
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  const [imageSize, setImageSize] = useState({ width: 0, height: 0 });
+  const [containerSize, setContainerSize] = useState({ width: 0, height: 0 });
   const imageRef = useRef<HTMLDivElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
+
+  // Handle image load to get natural dimensions
+  const handleImageLoad = (e: any) => {
+    const img = e.target as HTMLImageElement;
+    setImageSize({
+      width: img.naturalWidth,
+      height: img.naturalHeight
+    });
+  };
+
+  // Update container size on mount and resize
+  useEffect(() => {
+    const updateContainerSize = () => {
+      if (containerRef.current) {
+        const rect = containerRef.current.getBoundingClientRect();
+        setContainerSize({
+          width: rect.width,
+          height: rect.height
+        });
+      }
+    };
+
+    updateContainerSize();
+    window.addEventListener('resize', updateContainerSize);
+    return () => window.removeEventListener('resize', updateContainerSize);
+  }, [isFullscreen]);
 
   // Reset position and scale when zooming is disabled
   useEffect(() => {
@@ -29,55 +60,81 @@ export default function ImagePreview({ src, alt, prompt, onClose }: ImagePreview
     }
   }, [isZoomed]);
 
-  // Add event listener setup with { passive: false }
-  useEffect(() => {
-    const imageElement = imageRef.current;
-    if (!imageElement) return;
+  // Enhanced zoom functionality
+  const handleZoom = (e: WheelEvent | TouchEvent, deltaY?: number) => {
+    if (!isZoomed) return;
+    e.preventDefault();
 
-    const handleWheelEvent = (e: WheelEvent) => {
-      if (!isZoomed) return;
-      e.preventDefault();
-      const delta = e.deltaY * -0.01;
-      const newScale = Math.min(Math.max(1, scale + delta), 3);
-      setScale(newScale);
-    };
+    // Get cursor position relative to image
+    const rect = imageRef.current?.getBoundingClientRect();
+    if (!rect) return;
 
-    const handleTouchStartEvent = (e: TouchEvent) => {
-      setIsDragging(true);
-    };
-
-    const handleTouchMoveEvent = (e: TouchEvent) => {
-      if (!isDragging || !isZoomed || e.touches.length !== 2) return;
-      e.preventDefault();
+    let clientX, clientY;
+    if (e instanceof WheelEvent) {
+      clientX = e.clientX;
+      clientY = e.clientY;
+      deltaY = e.deltaY;
+    } else if (e instanceof TouchEvent && e.touches.length === 2) {
       const touch1 = e.touches[0];
       const touch2 = e.touches[1];
+      clientX = (touch1.clientX + touch2.clientX) / 2;
+      clientY = (touch1.clientY + touch2.clientY) / 2;
       const distance = Math.hypot(
         touch1.clientX - touch2.clientX,
         touch1.clientY - touch2.clientY
       );
-      const newScale = Math.min(Math.max(1, distance * 0.005), 3);
-      setScale(newScale);
+      deltaY = -distance * 0.1;
+    } else {
+      return;
+    }
+
+    const x = clientX - rect.left;
+    const y = clientY - rect.top;
+
+    // Calculate new scale
+    const delta = deltaY! * -0.01;
+    const newScale = Math.min(Math.max(1, scale + delta), 4);
+    
+    // Calculate new position to zoom towards cursor
+    const scaleChange = newScale - scale;
+    const newPosition = {
+      x: position.x - (x * scaleChange),
+      y: position.y - (y * scaleChange)
     };
 
-    const handleTouchEndEvent = () => {
-      setIsDragging(false);
-    };
+    setScale(newScale);
+    setPosition(newPosition);
+  };
 
-    // Add event listeners with { passive: false }
+  useEffect(() => {
+    const imageElement = imageRef.current;
+    if (!imageElement) return;
+
+    const handleWheelEvent = (e: WheelEvent) => handleZoom(e);
+    const handleTouchStartEvent = (e: TouchEvent) => setIsDragging(true);
+    const handleTouchMoveEvent = (e: TouchEvent) => handleZoom(e);
+    const handleTouchEndEvent = () => setIsDragging(false);
+
     imageElement.addEventListener('wheel', handleWheelEvent, { passive: false });
     imageElement.addEventListener('touchstart', handleTouchStartEvent, { passive: false });
     imageElement.addEventListener('touchmove', handleTouchMoveEvent, { passive: false });
     imageElement.addEventListener('touchend', handleTouchEndEvent, { passive: false });
 
-    // Cleanup
     return () => {
       imageElement.removeEventListener('wheel', handleWheelEvent);
       imageElement.removeEventListener('touchstart', handleTouchStartEvent);
       imageElement.removeEventListener('touchmove', handleTouchMoveEvent);
       imageElement.removeEventListener('touchend', handleTouchEndEvent);
     };
-  }, [isZoomed, isDragging, scale]);
+  }, [isZoomed, isDragging, scale, position]);
 
+  // Toggle fullscreen
+  const toggleFullscreen = () => {
+    setIsFullscreen(!isFullscreen);
+    setIsZoomed(false);
+  };
+
+  // Download functionality
   const handleDownload = async () => {
     try {
       const response = await fetch(src);
@@ -106,6 +163,7 @@ export default function ImagePreview({ src, alt, prompt, onClose }: ImagePreview
     }
   };
 
+  // Copy prompt functionality
   const handleCopyPrompt = async () => {
     try {
       await navigator.clipboard.writeText(prompt);
@@ -124,25 +182,59 @@ export default function ImagePreview({ src, alt, prompt, onClose }: ImagePreview
     }
   };
 
+  // Share functionality
+  const handleShare = async () => {
+    try {
+      if (navigator.share) {
+        await navigator.share({
+          title: 'Generated Image',
+          text: prompt,
+          url: src
+        });
+      } else {
+        await navigator.clipboard.writeText(src);
+        toast({
+          title: "Copied",
+          description: "Image URL copied to clipboard",
+        });
+      }
+    } catch (error) {
+      console.error('Share error:', error);
+    }
+  };
+
   return (
     <motion.div
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm"
+      className={cn(
+        "fixed inset-0 z-50 flex items-center justify-center",
+        "bg-gradient-to-br from-black/90 via-black/95 to-black/90",
+        "backdrop-blur-md"
+      )}
       onClick={onClose}
     >
       <div 
-        className="relative max-w-7xl mx-auto p-4" 
+        ref={containerRef}
+        className={cn(
+          "relative mx-auto transition-all duration-300 ease-out transform-gpu",
+          isFullscreen ? "w-screen h-screen" : "w-[90vw] h-[90vh] max-w-7xl"
+        )}
         onClick={e => e.stopPropagation()}
       >
+        {/* Image Container */}
         <div 
           ref={imageRef}
-          className="relative rounded-2xl overflow-hidden bg-white/5 backdrop-blur-md"
+          className={cn(
+            "relative w-full h-full rounded-2xl overflow-hidden",
+            "bg-gradient-to-br from-gray-900/50 to-black/50",
+            "backdrop-blur-xl shadow-2xl",
+            isFullscreen ? "" : "border border-white/10"
+          )}
         >
           <motion.div 
-            className={`relative ${isZoomed ? 'w-[90vw] h-[90vh]' : 'w-[80vw] h-[80vh]'} 
-              transition-all duration-300 cursor-move`}
+            className="relative w-full h-full"
             animate={{
               scale: scale,
               x: position.x,
@@ -158,62 +250,111 @@ export default function ImagePreview({ src, alt, prompt, onClose }: ImagePreview
               src={src}
               alt={alt}
               fill
-              className={`object-contain select-none transition-transform duration-300
-                ${isZoomed ? 'cursor-move' : 'cursor-zoom-in'}`}
+              className={cn(
+                "select-none transition-all duration-300 ease-out",
+                isZoomed ? "cursor-move" : "cursor-zoom-in",
+                "object-contain"
+              )}
               draggable={false}
               priority
+              quality={95}
+              onLoad={handleImageLoad}
             />
           </motion.div>
-          
-          <div className="absolute top-4 right-4 flex items-center gap-2">
-            <Button
-              variant="outline"
-              size="icon"
-              className="rounded-full bg-white/10 backdrop-blur-md 
-                hover:bg-white/20 border-white/20
-                text-white shadow-lg"
-              onClick={() => setIsZoomed(!isZoomed)}
-            >
-              {isZoomed ? (
-                <ZoomOut className="h-4 w-4" />
-              ) : (
-                <ZoomIn className="h-4 w-4" />
-              )}
-            </Button>
-            <Button
-              variant="outline"
-              size="icon"
-              className="rounded-full bg-white/10 backdrop-blur-md 
-                hover:bg-white/20 border-white/20
-                text-white shadow-lg"
-              onClick={handleCopyPrompt}
-            >
-              {isCopied ? (
-                <Check className="h-4 w-4" />
-              ) : (
-                <Copy className="h-4 w-4" />
-              )}
-            </Button>
-            <Button
-              variant="outline"
-              size="icon"
-              className="rounded-full bg-white/10 backdrop-blur-md 
-                hover:bg-white/20 border-white/20
-                text-white shadow-lg"
-              onClick={handleDownload}
-            >
-              <Download className="h-4 w-4" />
-            </Button>
-            <Button
-              variant="outline"
-              size="icon"
-              className="rounded-full bg-white/10 backdrop-blur-md 
-                hover:bg-white/20 border-white/20
-                text-white shadow-lg"
-              onClick={onClose}
-            >
-              <X className="h-4 w-4" />
-            </Button>
+
+          {/* Controls */}
+          <div className="absolute top-0 right-0 left-0 p-4 flex items-center justify-between
+            bg-gradient-to-b from-black/50 to-transparent">
+            {/* Left side - Image Info */}
+            <div className="flex items-center gap-4">
+              <div className="text-white/80 text-sm font-medium">
+                {imageSize.width} × {imageSize.height}
+              </div>
+            </div>
+
+            {/* Right side - Actions */}
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="icon"
+                className="rounded-full bg-white/10 backdrop-blur-md 
+                  hover:bg-white/20 border-white/20
+                  text-white shadow-lg"
+                onClick={() => setIsZoomed(!isZoomed)}
+              >
+                {isZoomed ? (
+                  <ZoomOut className="h-4 w-4" />
+                ) : (
+                  <ZoomIn className="h-4 w-4" />
+                )}
+              </Button>
+              <Button
+                variant="outline"
+                size="icon"
+                className="rounded-full bg-white/10 backdrop-blur-md 
+                  hover:bg-white/20 border-white/20
+                  text-white shadow-lg"
+                onClick={handleCopyPrompt}
+              >
+                {isCopied ? (
+                  <Check className="h-4 w-4" />
+                ) : (
+                  <Copy className="h-4 w-4" />
+                )}
+              </Button>
+              <Button
+                variant="outline"
+                size="icon"
+                className="rounded-full bg-white/10 backdrop-blur-md 
+                  hover:bg-white/20 border-white/20
+                  text-white shadow-lg"
+                onClick={handleShare}
+              >
+                <Share2 className="h-4 w-4" />
+              </Button>
+              <Button
+                variant="outline"
+                size="icon"
+                className="rounded-full bg-white/10 backdrop-blur-md 
+                  hover:bg-white/20 border-white/20
+                  text-white shadow-lg"
+                onClick={handleDownload}
+              >
+                <Download className="h-4 w-4" />
+              </Button>
+              <Button
+                variant="outline"
+                size="icon"
+                className="rounded-full bg-white/10 backdrop-blur-md 
+                  hover:bg-white/20 border-white/20
+                  text-white shadow-lg"
+                onClick={toggleFullscreen}
+              >
+                {isFullscreen ? (
+                  <Minimize2 className="h-4 w-4" />
+                ) : (
+                  <Maximize2 className="h-4 w-4" />
+                )}
+              </Button>
+              <Button
+                variant="outline"
+                size="icon"
+                className="rounded-full bg-white/10 backdrop-blur-md 
+                  hover:bg-white/20 border-white/20
+                  text-white shadow-lg"
+                onClick={onClose}
+              >
+                <X className="h-4 w-4" />
+              </Button>
+            </div>
+          </div>
+
+          {/* Prompt Display */}
+          <div className="absolute bottom-0 left-0 right-0 p-4
+            bg-gradient-to-t from-black/50 to-transparent">
+            <p className="text-white/90 text-sm line-clamp-2 max-w-3xl mx-auto text-center">
+              {prompt}
+            </p>
           </div>
         </div>
       </div>

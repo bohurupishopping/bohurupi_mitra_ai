@@ -221,6 +221,20 @@ function ChatInterface({ defaultMessage, sessionId, onModelChange }: ChatInterfa
   const [isStoryRewriterOpen, setIsStoryRewriterOpen] = useState(false);
   const [isSEOOptimizerOpen, setIsSEOOptimizerOpen] = useState(false);
 
+  const inputAreaStyles = {
+    wrapper: `relative flex flex-row items-start gap-2 max-w-2xl mx-auto`,
+    attachmentsArea: `flex-shrink-0 w-[100px] sm:w-[120px] 
+      overflow-y-auto max-h-[200px] rounded-xl
+      bg-white/50 dark:bg-gray-900/50 backdrop-blur-sm
+      border border-green-100/20 dark:border-green-400/10
+      p-1.5 space-y-1.5
+      scrollbar-thin scrollbar-thumb-green-200/30 dark:scrollbar-thumb-green-400/10
+      scrollbar-track-transparent
+      transition-all duration-300
+      ${attachments.length === 0 ? 'hidden' : ''}`,
+    inputContainer: `flex-1 relative group min-w-0`
+  } as const;
+
   useEffect(() => {
     if (messagesEndRef.current) {
       const scrollOptions: ScrollIntoViewOptions = {
@@ -730,9 +744,72 @@ function ChatInterface({ defaultMessage, sessionId, onModelChange }: ChatInterfa
           </div>
 
           <div className="border-t border-white/10 bg-transparent p-1 sm:p-2">
-            <div className="max-w-2xl mx-auto">
-              <form onSubmit={handleSubmit} className="space-y-2">
-                <div className="relative group">
+            <form onSubmit={handleSubmit} className="space-y-2">
+              <div className={inputAreaStyles.wrapper}>
+                {/* Attachments Area - Left Side */}
+                <div className={inputAreaStyles.attachmentsArea}>
+                  {attachments.map((attachment) => (
+                    <div key={attachment.id} 
+                      className="relative group/attachment 
+                        flex items-center w-full h-[90px] sm:h-[100px]
+                        bg-white/30 dark:bg-gray-800/30 
+                        rounded-lg p-1.5
+                        ring-1 ring-green-100/30 dark:ring-green-400/20
+                        shadow-sm hover:shadow-md
+                        transform hover:scale-[1.02] 
+                        transition-all duration-200">
+                      {attachment.type === 'image' && attachment.preview && (
+                        <div className="relative w-[70px] h-[70px] sm:w-[80px] sm:h-[80px]
+                          mx-auto overflow-hidden">
+                          <img 
+                            src={attachment.preview} 
+                            alt="Attachment preview" 
+                            className="w-full h-full object-cover rounded-md"
+                          />
+                        </div>
+                      )}
+                      {attachment.type === 'document' && (
+                        <div className="w-[70px] h-[70px] sm:w-[80px] sm:h-[80px]
+                          mx-auto
+                          bg-white/80 dark:bg-gray-800/80 
+                          rounded-md flex flex-col items-center justify-center
+                          gap-1">
+                          <File className="w-8 h-8 text-gray-400 dark:text-gray-500" />
+                          <p className="text-[10px] text-gray-500 dark:text-gray-400 text-center px-1 truncate max-w-full">
+                            {attachment.file.name}
+                          </p>
+                        </div>
+                      )}
+                      <div className="absolute bottom-1 left-1/2 -translate-x-1/2 text-[10px] text-gray-400">
+                        {Math.round(attachment.file.size / 1024)}KB
+                      </div>
+                      {attachment.uploading ? (
+                        <div className="absolute inset-0 bg-black/50 rounded-lg
+                          flex items-center justify-center backdrop-blur-sm">
+                          <RefreshCw className="w-4 h-4 text-white animate-spin" />
+                        </div>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => removeAttachment(attachment.id)}
+                          className="absolute -top-1 -right-1 
+                            bg-red-500/90 hover:bg-red-500
+                            text-white rounded-full p-1
+                            opacity-0 scale-75
+                            group-hover/attachment:opacity-100 
+                            group-hover/attachment:scale-100
+                            shadow-sm hover:shadow-md
+                            transition-all duration-200
+                            z-10">
+                          <X className="w-3 h-3" />
+                        </button>
+                      )}
+                    </div>
+                  ))}
+                </div>
+
+                {/* Input Area - Right Side */}
+                <div className={inputAreaStyles.inputContainer}>
                   <div className="absolute -inset-1 bg-gradient-to-r from-green-400/20 via-emerald-400/20 to-teal-400/20 
                     dark:from-green-300/30 dark:via-emerald-300/30 dark:to-teal-300/30
                     rounded-[1.5rem] blur-xl opacity-70 group-hover:opacity-100 
@@ -753,76 +830,17 @@ function ChatInterface({ defaultMessage, sessionId, onModelChange }: ChatInterfa
                       />
                     </div>
 
-                    {attachments.length > 0 && (
-                      <div className="flex flex-wrap items-center gap-2 px-3 py-1 mt-[2.75rem] border-b border-green-100/20
-                        bg-white/5 dark:bg-gray-900/5 backdrop-blur-sm
-                        h-[38px] overflow-y-auto
-                        scrollbar-thin scrollbar-thumb-green-200/30 dark:scrollbar-thumb-green-400/10
-                        scrollbar-track-transparent">
-                        {attachments.map((attachment) => (
-                          <div key={attachment.id} 
-                            className="relative group/attachment 
-                              flex items-center h-[28px]
-                              flex-shrink-0 transform hover:scale-105 
-                              transition-all duration-200">
-                            {attachment.type === 'image' && attachment.preview && (
-                              <div className="relative w-[28px] h-[28px]">
-                                <img 
-                                  src={attachment.preview} 
-                                  alt="Attachment preview" 
-                                  className="w-full h-full object-cover rounded-md
-                                    ring-1 ring-green-100/30 dark:ring-green-400/20
-                                    shadow-sm"
-                                />
-                              </div>
-                            )}
-                            {attachment.type === 'document' && (
-                              <div className="w-[28px] h-[28px]
-                                bg-white/80 dark:bg-gray-800/80 
-                                rounded-md flex items-center justify-center
-                                ring-1 ring-green-100/30 dark:ring-green-400/20
-                                shadow-sm">
-                                <File className="w-4 h-4 text-gray-400 dark:text-gray-500" />
-                              </div>
-                            )}
-                            {attachment.uploading && (
-                              <div className="absolute inset-0 bg-black/50 rounded-md 
-                                flex items-center justify-center backdrop-blur-sm">
-                                <RefreshCw className="w-3 h-3 text-white animate-spin" />
-                              </div>
-                            )}
-                            <button
-                              type="button"
-                              onClick={() => removeAttachment(attachment.id)}
-                              className="absolute -top-1 -right-1 
-                                bg-red-500/90 hover:bg-red-500
-                                text-white rounded-full p-0.5
-                                opacity-0 scale-75
-                                group-hover/attachment:opacity-100 
-                                group-hover/attachment:scale-100
-                                shadow-sm hover:shadow-md
-                                transition-all duration-200
-                                z-10"
-                            >
-                              <X className="w-2.5 h-2.5" />
-                            </button>
-                          </div>
-                        ))}
-                        <div className="text-xs text-gray-500/80 dark:text-gray-400/80 ml-1">
-                          {attachments.length} {attachments.length === 1 ? 'file' : 'files'}
-                        </div>
-                      </div>
-                    )}
-
                     <Textarea
                       ref={inputRef}
                       value={prompt}
                       onChange={(e) => {
                         setPrompt(e.target.value);
-                        // Reset height first to get accurate scrollHeight
-                        e.target.style.height = 'auto';
-                        const scrollHeight = Math.max(45, e.target.scrollHeight); // Minimum height of 45px
-                        e.target.style.height = `${Math.min(scrollHeight, 300)}px`; // Max height of 300px
+                        const element = e.target;
+                        requestAnimationFrame(() => {
+                          element.style.height = 'auto';
+                          const scrollHeight = Math.max(45, element.scrollHeight);
+                          element.style.height = `${Math.min(scrollHeight, 300)}px`;
+                        });
                       }}
                       onKeyDown={(e) => {
                         if (e.key === 'Enter' && !e.shiftKey) {
@@ -841,7 +859,7 @@ function ChatInterface({ defaultMessage, sessionId, onModelChange }: ChatInterfa
                         overflow-y-auto scrollbar-thin scrollbar-thumb-green-200/30 
                         dark:scrollbar-thumb-green-400/10 scrollbar-track-transparent"
                       style={{ 
-                        height: '45px', // Initial height
+                        height: '45px',
                         lineHeight: '1.5'
                       }}
                     />
@@ -899,8 +917,8 @@ function ChatInterface({ defaultMessage, sessionId, onModelChange }: ChatInterfa
                     />
                   </div>
                 </div>
-              </form>
-            </div>
+              </div>
+            </form>
           </div>
         </CardContent>
       </Card>

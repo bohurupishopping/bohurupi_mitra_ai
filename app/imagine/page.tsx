@@ -18,15 +18,15 @@ import ImageTypeSelector from '@/components/imagine/ImageTypeSelector';
 import ModelSelector from '@/components/imagine/ModelSelector';
 import SizeSelector from '@/components/imagine/SizeSelector';
 
-// Optimize image variants for better performance
+// Optimize image variants for smoother performance
 const imageVariants = {
   hidden: { 
     opacity: 0,
-    y: 5
+    scale: 0.98
   },
   visible: { 
     opacity: 1,
-    y: 0,
+    scale: 1,
     transition: { 
       duration: 0.2,
       ease: "easeOut"
@@ -34,6 +34,7 @@ const imageVariants = {
   },
   exit: { 
     opacity: 0,
+    scale: 0.98,
     transition: { 
       duration: 0.15,
       ease: "easeIn"
@@ -42,25 +43,30 @@ const imageVariants = {
   hover: {
     y: -2,
     transition: {
-      duration: 0.2,
-      ease: "easeOut"
+      type: "spring",
+      stiffness: 300,
+      damping: 20
     }
   }
 };
 
 // Optimize loading variants
 const loadingVariants = {
-  initial: { opacity: 0 },
+  initial: { opacity: 0, scale: 0.98 },
   animate: { 
     opacity: 1,
+    scale: 1,
     transition: {
-      duration: 0.2
+      duration: 0.2,
+      ease: "easeOut"
     }
   },
   exit: { 
     opacity: 0,
+    scale: 0.98,
     transition: {
-      duration: 0.15
+      duration: 0.15,
+      ease: "easeIn"
     }
   }
 };
@@ -279,6 +285,83 @@ function ImagineContent() {
     }
   };
 
+  // Optimize image loading with virtualization
+  const virtualizedImages = useCallback(() => {
+    return historyImages.slice(0, visibleImages).map((imageSession, index) => {
+      const isVisible = index < visibleImages;
+      const isPriority = index < 4;
+      
+      return (
+        <m.div
+          key={`history-${imageSession.id}`}
+          variants={imageVariants}
+          initial="hidden"
+          animate="visible"
+          exit="exit"
+          whileHover="hover"
+          layout="position"
+          layoutId={`image-${imageSession.id}`}
+          className="relative aspect-square rounded-2xl overflow-hidden
+            shadow-lg hover:shadow-xl 
+            bg-white/50 backdrop-blur-sm border border-white/20
+            cursor-pointer group transform-gpu will-change-transform"
+          onClick={() => {
+            setSelectedImage(imageSession.image_url);
+            setSelectedImagePrompt(imageSession.prompt);
+          }}
+        >
+          {isVisible && (
+            <>
+              <div className="absolute inset-0 bg-gray-100 animate-pulse" />
+              <Image
+                src={imageSession.image_url}
+                alt={`Generated image ${index + 1}`}
+                fill
+                priority={isPriority}
+                className="object-contain bg-black/50"
+                sizes="(max-width: 768px) 45vw, (max-width: 1200px) 30vw, 23vw"
+                loading={isPriority ? "eager" : "lazy"}
+                quality={isPriority ? 85 : 70}
+                onLoad={(e) => {
+                  const img = e.target as HTMLImageElement;
+                  if (img.naturalWidth > img.naturalHeight) {
+                    img.classList.remove('object-contain');
+                    img.classList.add('object-cover');
+                  }
+                }}
+              />
+              
+              <m.div 
+                className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 
+                  transition-opacity duration-200"
+                whileTap={{ scale: 0.95 }}
+              >
+                <Button
+                  variant="destructive"
+                  size="icon"
+                  className="h-8 w-8 rounded-full bg-red-500/80 hover:bg-red-600
+                    shadow-lg backdrop-blur-sm"
+                  onClick={(e) => handleDeleteImage(imageSession.id, e)}
+                >
+                  <Trash2 className="h-4 w-4 text-white" />
+                </Button>
+              </m.div>
+            </>
+          )}
+        </m.div>
+      );
+    });
+  }, [historyImages, visibleImages, handleDeleteImage]);
+
+  // Optimize scroll behavior with throttling
+  const throttledLoadMore = useCallback(() => {
+    if (!isLoadingMore) {
+      requestAnimationFrame(() => {
+        loadMoreImages();
+      });
+    }
+  }, [isLoadingMore, loadMoreImages]);
+
   return (
     <div className="flex h-[100dvh] overflow-hidden bg-gradient-to-br from-purple-100 via-blue-100 to-pink-100">
       <Sidebar 
@@ -296,7 +379,8 @@ function ImagineContent() {
             shadow-lg
             relative flex flex-col overflow-hidden
             w-full max-w-[1400px] mx-auto
-            h-[calc(100dvh-20px)] sm:h-[calc(98dvh-16px)]">
+            h-[calc(100dvh-20px)] sm:h-[calc(98dvh-16px)]
+            transform-gpu">
             
             <div className="absolute inset-0 rounded-[2rem] sm:rounded-[2.5rem]">
               <div className="absolute inset-0 rounded-[2rem] sm:rounded-[2.5rem] 
@@ -310,7 +394,7 @@ function ImagineContent() {
                 scrollbar-thin scrollbar-thumb-black/10 scrollbar-track-transparent
                 overscroll-bounce"
             >
-              <LazyMotion features={domAnimation}>
+              <LazyMotion features={domAnimation} strict>
                 <m.div 
                   ref={gridRef}
                   className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 max-w-7xl mx-auto"
@@ -323,7 +407,8 @@ function ImagineContent() {
                       exit="exit"
                       className="relative aspect-square rounded-2xl overflow-hidden
                         shadow-lg bg-white/50 backdrop-blur-sm border border-white/20
-                        flex items-center justify-center col-span-1 row-start-1"
+                        flex items-center justify-center col-span-1 row-start-1
+                        transform-gpu"
                     >
                       <div className="absolute inset-0 flex flex-col items-center justify-center p-6">
                         <RefreshCw className="w-8 h-8 text-gray-400/80 animate-spin" />
@@ -335,52 +420,7 @@ function ImagineContent() {
                   )}
                   
                   <AnimatePresence mode="popLayout">
-                    {historyImages.slice(0, visibleImages).map((imageSession, index) => (
-                      <m.div
-                        key={`history-${imageSession.id}`}
-                        variants={imageVariants}
-                        initial="hidden"
-                        animate="visible"
-                        exit="exit"
-                        whileHover="hover"
-                        layout="position"
-                        layoutId={`image-${imageSession.id}`}
-                        className="relative aspect-square rounded-2xl overflow-hidden
-                          shadow-lg hover:shadow-xl 
-                          bg-white/50 backdrop-blur-sm border border-white/20
-                          cursor-pointer group transform-gpu"
-                        onClick={() => {
-                          setSelectedImage(imageSession.image_url);
-                          setSelectedImagePrompt(imageSession.prompt);
-                        }}
-                      >
-                        <Image
-                          src={imageSession.image_url}
-                          alt={`History image ${index + 1}`}
-                          fill
-                          priority={index < 4}
-                          className="object-cover"
-                          sizes="(max-width: 768px) 50vw, (max-width: 1200px) 33vw, 25vw"
-                          loading={index < 8 ? "eager" : "lazy"}
-                          quality={index < 8 ? 85 : 75}
-                        />
-                        
-                        <m.div 
-                          className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 
-                            transition-opacity duration-200"
-                          whileTap={{ scale: 0.95 }}
-                        >
-                          <Button
-                            variant="destructive"
-                            size="icon"
-                            className="h-8 w-8 rounded-full bg-red-500/80 hover:bg-red-600"
-                            onClick={(e) => handleDeleteImage(imageSession.id, e)}
-                          >
-                            <Trash2 className="h-4 w-4 text-white" />
-                          </Button>
-                        </m.div>
-                      </m.div>
-                    ))}
+                    {virtualizedImages()}
                   </AnimatePresence>
 
                   {historyImages.length > visibleImages && inView && (
@@ -391,9 +431,10 @@ function ImagineContent() {
                     >
                       <Button
                         variant="outline"
-                        onClick={loadMoreImages}
+                        onClick={throttledLoadMore}
                         disabled={isLoadingMore}
-                        className="bg-white/50 backdrop-blur-sm hover:bg-white/60"
+                        className="bg-white/50 backdrop-blur-sm hover:bg-white/60
+                          transform-gpu transition-all duration-200"
                       >
                         {isLoadingMore ? (
                           <RefreshCw className="w-4 h-4 mr-2 animate-spin" />

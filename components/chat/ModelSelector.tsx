@@ -125,6 +125,48 @@ export function ModelSelector({ onModelChange, compact, isChatMode }: ModelSelec
   const [selectedProvider, setSelectedProvider] = useState<string>('');
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [selectedModel, setSelectedModel] = useState<string>('');
+
+  // Load saved preferences
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const savedProvider = localStorage.getItem('selectedProvider');
+      const savedModel = localStorage.getItem('selectedModel');
+      if (savedProvider) setSelectedProvider(savedProvider);
+      if (savedModel) {
+        setSelectedModel(savedModel);
+        onModelChange(savedModel);
+      }
+    }
+  }, []);
+
+  // Save provider selection
+  const handleProviderChange = (provider: string) => {
+    setSelectedProvider(provider);
+    localStorage.setItem('selectedProvider', provider);
+    
+    // When provider changes, select first model of that provider if no saved model exists for it
+    const providerConfig = providerConfigs.find(p => p.name === provider);
+    if (providerConfig?.models.length) {
+      const savedModel = localStorage.getItem('selectedModel');
+      const providerModels = providerConfig.models.map(m => m.value);
+      
+      // If saved model doesn't belong to new provider, select first model
+      if (!savedModel || !providerModels.includes(savedModel)) {
+        const newModel = providerConfig.models[0].value;
+        setSelectedModel(newModel);
+        localStorage.setItem('selectedModel', newModel);
+        onModelChange(newModel);
+      }
+    }
+  };
+
+  // Save model selection
+  const handleModelChange = (model: string) => {
+    setSelectedModel(model);
+    localStorage.setItem('selectedModel', model);
+    onModelChange(model);
+  };
 
   useEffect(() => {
     const fetchModels = async () => {
@@ -224,16 +266,35 @@ export function ModelSelector({ onModelChange, compact, isChatMode }: ModelSelec
     }
   ], [groqModels, geminiModels, openRouterModels]);
 
-  // Set default provider and model
+  // Modified default provider and model setup
   React.useEffect(() => {
-    if (!isLoading && providerConfigs.length > 0) {
+    if (!isLoading && providerConfigs.length > 0 && !selectedProvider) {
+      const savedProvider = localStorage.getItem('selectedProvider');
+      const savedModel = localStorage.getItem('selectedModel');
+
+      if (savedProvider && savedModel) {
+        const providerConfig = providerConfigs.find(p => p.name === savedProvider);
+        if (providerConfig && providerConfig.models.some(m => m.value === savedModel)) {
+          setSelectedProvider(savedProvider);
+          setSelectedModel(savedModel);
+          onModelChange(savedModel);
+          return;
+        }
+      }
+
+      // If no valid saved preferences, set defaults
       const firstProvider = providerConfigs[0];
       setSelectedProvider(firstProvider.name);
+      localStorage.setItem('selectedProvider', firstProvider.name);
+      
       if (firstProvider.models.length > 0) {
-        onModelChange(firstProvider.models[0].value);
+        const firstModel = firstProvider.models[0].value;
+        setSelectedModel(firstModel);
+        localStorage.setItem('selectedModel', firstModel);
+        onModelChange(firstModel);
       }
     }
-  }, [isLoading, providerConfigs]);
+  }, [isLoading, providerConfigs, onModelChange]);
 
   const IconComponent = ({ icon: Icon, color, bgColor }: { 
     icon: React.ElementType,
@@ -276,7 +337,7 @@ export function ModelSelector({ onModelChange, compact, isChatMode }: ModelSelec
   return (
     <div className="flex gap-2">
       {/* Provider Selection */}
-      <Select value={selectedProvider} onValueChange={setSelectedProvider}>
+      <Select value={selectedProvider} onValueChange={handleProviderChange}>
         <SelectTrigger 
           className={`${compact ? 'w-[120px]' : 'w-[140px]'} 
             bg-white/10 backdrop-blur-sm border border-white/20
@@ -331,7 +392,8 @@ export function ModelSelector({ onModelChange, compact, isChatMode }: ModelSelec
 
       {/* Model Selection */}
       <Select 
-        onValueChange={onModelChange}
+        value={selectedModel}
+        onValueChange={handleModelChange}
         disabled={!selectedProvider}
       >
         <SelectTrigger 

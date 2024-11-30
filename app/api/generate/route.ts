@@ -38,6 +38,11 @@ const groqClient = createGroq({
 // Initialize Google AI client
 const googleAI = new GoogleGenerativeAI(process.env.GOOGLE_API_KEY || '');
 
+const githubAIClient = new OpenAI({
+  baseURL: "https://models.inference.ai.azure.com",
+  apiKey: process.env.GITHUB_AI_TOKEN || '',
+});
+
 export async function POST(req: Request) {
   try {
     const { model, prompt, options } = await req.json();
@@ -171,6 +176,17 @@ export async function POST(req: Request) {
       result = response.text;
     }
     // Handle other models
+    else if (model === 'github-gpt4-mini') {
+      const response = await githubAIClient.chat.completions.create({
+        model: 'gpt-4o-mini',
+        messages: [{ role: 'user', content: prompt }],
+        temperature: options?.temperature || 1.0,
+        top_p: options?.topP || 1.0,
+        max_tokens: options?.maxTokens || 1000,
+      });
+
+      result = response.choices[0]?.message?.content;
+    }
     else {
       let modelInstance;
       switch (model) {

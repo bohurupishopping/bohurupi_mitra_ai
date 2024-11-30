@@ -36,8 +36,8 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { ConversationService, ChatSession } from '@/services/conversationService';
 import { Database } from '@/types/supabase';
-import { getSupabaseClient } from '@/lib/supabaseClient';
-import { PostgrestError } from '@supabase/supabase-js';
+import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
+import type { Json } from '@/types/supabase';
 
 interface SidebarProps {
   isOpen: boolean;
@@ -45,10 +45,20 @@ interface SidebarProps {
 }
 
 interface UserProfile {
+  id: string;
   user_id: string;
   display_name: string | null;
-  // Add other fields if needed
+  created_at: string;
+  updated_at: string;
 }
+
+// Add type for conversation data
+type ConversationData = Database['public']['Tables']['conversations']['Row'];
+type ConversationMetadata = {
+  deleted_at?: string;
+  deleted_by?: string;
+  [key: string]: any;
+};
 
 export default function Sidebar({ isOpen, onToggle }: SidebarProps) {
   const [isMobile, setIsMobile] = useState(false);
@@ -62,8 +72,8 @@ export default function Sidebar({ isOpen, onToggle }: SidebarProps) {
   const [chatSessions, setChatSessions] = useState<ChatSession[]>([]);
   const [userProfile, setUserProfile] = useState<{ display_name: string | null }>({ display_name: null });
   
-  // Use useMemo to ensure consistent reference
-  const supabase = useMemo(() => getSupabaseClient(), []);
+  // Initialize Supabase client
+  const supabase = useMemo(() => createClientComponentClient<Database>(), []);
   const conversationService = useMemo(() => new ConversationService(currentSessionId || undefined), [currentSessionId]);
 
   const loadChatSessions = useCallback(async () => {
@@ -92,38 +102,57 @@ export default function Sidebar({ isOpen, onToggle }: SidebarProps) {
     }
   }, [conversationService, toast]);
 
-  // Fetch user profile
+  // Improved fetchUserProfile with proper error handling
   const fetchUserProfile = useCallback(async () => {
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (user) {
-        const { data: profile, error } = await supabase
-          .from('user_profiles')
-          .select('display_name')
-          .eq('user_id', user.id)
-          .single<Pick<UserProfile, 'display_name'>>();
+      // Get current user
+      const { data: { user }, error: authError } = await supabase.auth.getUser();
+      if (authError) throw authError;
+      if (!user) return;
 
-        if (error) {
-          const postgrestError = error as PostgrestError;
-          console.error('Error fetching user profile:', postgrestError.message);
-          return;
-        }
+      // Set email immediately if available
+      if (user.email) setUserEmail(user.email);
 
-        if (profile) {
-          setUserProfile({ display_name: profile.display_name ?? null });
-          if (user.email) {
-            setUserEmail(user.email);
+      // Get or create profile
+      const { data: profile, error: profileError } = await supabase
+        .from('user_profiles')
+        .select('*')
+        .eq('user_id', user.id)
+        .single<UserProfile>();
+
+      if (profileError) {
+        if (profileError.code === 'PGRST116') {
+          // Profile doesn't exist, create one
+          const { data: newProfile, error: insertError } = await supabase
+            .from('user_profiles')
+            .insert([{
+              user_id: user.id,
+              display_name: user.email?.split('@')[0] || 'User',
+              created_at: new Date().toISOString(),
+              updated_at: new Date().toISOString()
+            }])
+            .select('*')
+            .single<UserProfile>();
+
+          if (insertError) throw insertError;
+          if (newProfile) {
+            setUserProfile({ display_name: newProfile.display_name });
           }
+        } else {
+          throw profileError;
         }
+      } else if (profile) {
+        setUserProfile({ display_name: profile.display_name });
       }
     } catch (error) {
-      if (error instanceof Error) {
-        console.error('Error fetching user data:', error.message);
-      } else {
-        console.error('Unknown error fetching user data');
-      }
+      console.error('Error in fetchUserProfile:', error);
+      toast({
+        title: "Profile Error",
+        description: "Failed to load user profile. Please try refreshing.",
+        variant: "destructive",
+      });
     }
-  }, [supabase]);
+  }, [supabase, toast]);
 
   useEffect(() => {
     fetchUserProfile();
@@ -164,28 +193,109 @@ export default function Sidebar({ isOpen, onToggle }: SidebarProps) {
     };
   }, [supabase, router]);
 
+  // Improved delete function with proper database deletion
   const handleDeleteSession = async (sessionId: string) => {
     try {
-      await conversationService.deleteChatSession(sessionId);
-      setChatSessions(prev => prev.filter(session => session.session_id !== sessionId));
-      
+      // Start loading state
+      toast({
+        title: "Deleting...",
+        description: "Please wait while we delete the chat history",
+      });
+
+      // Get current user
+      const { data: { user }, error: authError } = await supabase.auth.getUser();
+      if (authError) throw authError;
+
+      // First, verify the session exists and belongs to the user
+      const { data: conversations, error: fetchError } = await supabase
+        .from('conversations')
+        .select('*')
+        .eq('session_id', sessionId)
+        .eq('is_deleted', false)
+        .returns<ConversationData[]>();
+
+      if (fetchError) throw fetchError;
+      if (!conversations || conversations.length === 0) {
+        throw new Error('Chat session not found or already deleted');
+      }
+
+      // Verify ownership
+      const sessionUserId = conversations[0].user_id;
+      if (sessionUserId && user?.id !== sessionUserId) {
+        throw new Error('You do not have permission to delete this chat');
+      }
+
+      // Parse existing metadata and prepare new metadata
+      const existingMetadata = (conversations[0].metadata || {}) as ConversationMetadata;
+      const newMetadata: Json = {
+        ...existingMetadata,
+        deleted_at: new Date().toISOString(),
+        deleted_by: user?.id || 'anonymous'
+      };
+
+      // Perform the delete operation with proper type handling
+      const { error: deleteError } = await supabase
+        .from('conversations')
+        .update({
+          is_deleted: true,
+          metadata: newMetadata
+        })
+        .eq('session_id', sessionId);
+
+      if (deleteError) throw deleteError;
+
+      // Update local state
+      setChatSessions(prev => 
+        prev.filter(session => session.session_id !== sessionId)
+      );
+
+      // If current session is deleted, redirect
       if (currentSessionId === sessionId) {
         router.push('/chat');
       }
 
+      // Dispatch event for other components
+      window.dispatchEvent(new CustomEvent('chat-updated'));
+
+      // Show success message
       toast({
-        title: "Chat Deleted",
+        title: "Success",
         description: "Chat history has been permanently deleted",
       });
 
+      // Reload sessions to ensure sync
       await loadChatSessions();
+
     } catch (error) {
-      console.error('Error deleting session:', error);
+      console.error('Error in handleDeleteSession:', error);
+      
+      // Revert local state
+      await loadChatSessions();
+      
       toast({
-        title: "Error",
-        description: "Failed to delete chat history",
+        title: "Delete Failed",
+        description: error instanceof Error 
+          ? error.message 
+          : "Failed to delete chat history. Please try again.",
         variant: "destructive",
       });
+    }
+  };
+
+  // Add confirmation before delete with more context
+  const handleDeleteWithConfirmation = async (sessionId: string) => {
+    const session = chatSessions.find(s => s.session_id === sessionId);
+    if (!session) return;
+
+    const confirmed = window.confirm(
+      `Are you sure you want to delete this chat?\n\n` +
+      `Last message: "${session.last_message}"\n` +
+      `Messages: ${session.message_count}\n\n` +
+      `This action cannot be undone.`
+    );
+    
+    if (confirmed) {
+      await handleDeleteSession(sessionId);
     }
   };
 
@@ -487,11 +597,13 @@ export default function Sidebar({ isOpen, onToggle }: SidebarProps) {
                                   View Chat
                                 </DropdownMenuItem>
                                 <DropdownMenuItem 
-                                  onClick={() => handleDeleteSession(session.session_id)}
-                                  className="text-red-600 hover:text-red-700"
+                                  onClick={() => handleDeleteWithConfirmation(session.session_id)}
+                                  className="text-red-600 hover:text-red-700 cursor-pointer 
+                                    flex items-center gap-2 px-3 py-2 text-sm
+                                    hover:bg-red-50 transition-colors duration-200"
                                 >
-                                  <Trash2 className="mr-2 h-4 w-4" />
-                                  Delete
+                                  <Trash2 className="h-4 w-4" />
+                                  <span>Delete Chat</span>
                                 </DropdownMenuItem>
                               </DropdownMenuContent>
                             </DropdownMenu>

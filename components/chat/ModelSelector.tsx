@@ -115,6 +115,14 @@ const STATIC_MODEL_CONFIGS: ModelConfig[] = [
     icon: Sparkles,
     color: 'text-blue-500',
     bgColor: 'bg-blue-50',
+  },
+  { 
+    provider: 'GitHub',
+    value: 'github-gpt4-mini',
+    label: 'GPT-4 Mini',
+    icon: Bot,
+    color: 'text-purple-500',
+    bgColor: 'bg-purple-50',
   }
 ];
 
@@ -263,6 +271,13 @@ export function ModelSelector({ onModelChange, compact, isChatMode }: ModelSelec
         color: 'text-orange-500',
         bgColor: 'bg-orange-50',
       }))
+    },
+    {
+      name: 'GitHub',
+      icon: Bot,
+      color: 'text-purple-500',
+      bgColor: 'bg-purple-50',
+      models: STATIC_MODEL_CONFIGS.filter(m => m.provider === 'GitHub')
     }
   ], [groqModels, geminiModels, openRouterModels]);
 

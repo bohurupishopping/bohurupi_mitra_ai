@@ -15,7 +15,7 @@ export async function GET() {
     // Our preferred models in order
     const preferredModels = [
       'llama-3.2-90b-vision-preview',
-      'llama-3.2-11b-vision-preview'
+      'llama-3.3-70b-versatile'
     ];
 
     // Filter and format models
